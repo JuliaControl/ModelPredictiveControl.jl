@@ -158,7 +158,7 @@ struct MovingHorizonEstimator{
         gc!::GCfunc, nc, p::PT,
         transcription::TM, optim::JM, 
         gradient::GB, jacobian::JB, hessian::HB, covestim::CE;
-        direct=true
+        direct=true, verify_obsv=true
     ) where {
             NT<:Real, 
             SM<:SimModel{NT}, 
@@ -182,7 +182,8 @@ struct MovingHorizonEstimator{
         nxs = size(As, 1)
         nx̂ = model.nx + nxs
         nŵ = nx̂
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
+            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
@@ -556,7 +557,8 @@ function MovingHorizonEstimator(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    verify_obsv = true,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -589,7 +591,7 @@ function MovingHorizonEstimator(
     return MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt;
         gc, gc!, nc, p, 
-        transcription, optim, gradient, jacobian, hessian, covestim, direct
+        transcription, optim, gradient, jacobian, hessian, covestim, direct, verify_obsv
     )
 end
 
@@ -606,6 +608,7 @@ end
         hessian=false,
         covestim=nothing,
         direct=true,
+        verify_obsv=true,
     )
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
@@ -627,6 +630,7 @@ function MovingHorizonEstimator(
     hessian::Union{AbstractADType, Bool, Nothing} = false,
     covestim::Union{StateEstimator, Nothing} = nothing,
     direct = true,
+    verify_obsv = true,
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     if isnothing(P̂_0)
         if isnothing(covestim)
@@ -639,7 +643,9 @@ function MovingHorizonEstimator(
     gc! = get_mutating_gc_mhe(NT, gc)
     hessian = validate_hessian(hessian, DEFAULT_NONLINMHE_HESSIAN, gradient)
     if isnothing(covestim)
-        covestim = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+        covestim = default_covestim_mhe(
+            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv
+        )
     end
     validate_covestim(cov, covestim)
     setstate!(covestim, covestim.x̂0 + covestim.x̂op, P̂_0)
@@ -648,7 +654,7 @@ function MovingHorizonEstimator(
         He, i_ym, nint_u, nint_ym, cov, Cwt,
         gc!, nc, p,
         transcription, optim, gradient, jacobian, hessian, covestim; 
-        direct
+        direct, verify_obsv
     )
 end
 
@@ -662,11 +668,18 @@ function default_optim_mhe(model::SimModel, nc)
 end
 
 "Default arrival covariance estimator for MHE, depending on the model type only."
-function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+function default_covestim_mhe(
+    model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂;
+    direct, verify_obsv=true
+)
     if model isa LinModel
-        return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+        return KalmanFilter(
+            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv
+        )
     elseif model isa NonLinModel
-        return UnscentedKalmanFilter(model,  i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+        return UnscentedKalmanFilter(
+            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv
+        )
     else
         # SteadyKalmanFilter with arbitrary LinModel (will be ignored):
         nx, nu, ny = model.nx, model.nu, model.ny
@@ -674,7 +687,9 @@ function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂
         A = Diagonal(poles) # distinct and stable poles for observability
         Bu, C = ones(nx, nu), ones(ny, nx)
         dummy_model = LinModel(A, Bu, C, 0, 0, model.Ts)
-        return SteadyKalmanFilter(dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
+        return SteadyKalmanFilter(
+            dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct, verify_obsv
+        )
     end
 end
 

@@ -33,14 +33,15 @@ struct SteadyKalmanFilter{
     prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function SteadyKalmanFilter{NT}(
-        model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
+        model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true, verify_obsv=true
     ) where {NT<:Real, SM<:LinModel, KC<:KalmanCovariances}
         nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
+            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         R̂, Q̂ = cov.R̂, cov.Q̂
         K̂, P̂ = init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct)
@@ -111,6 +112,10 @@ state of the next time step ``\mathbf{x̂}_k(k+1)``. This estimator is allocatio
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
+    `false` to disable this check.
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
+    `false` to disable this check.
 
 # Examples
 ```jldoctest
@@ -166,7 +171,8 @@ function SteadyKalmanFilter(
     sigmaQ = fill(1/model.nx, model.nx),
     sigmaR = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    verify_obsv = true,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
     sigmaQint_u  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_ym = fill(1, max(sum(nint_ym), 0)),
     direct   = true,
@@ -178,7 +184,7 @@ function SteadyKalmanFilter(
     # estimated covariances matrices (variance = σ²) :
     Q̂ = Diagonal([σQ;  σQint_u;  σQint_ym].^2)
     R̂ = Diagonal([σR;].^2)
-    return SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct)
+    return SteadyKalmanFilter(model, i_ym, nint_u, nint_ym, Q̂, R̂; direct, verify_obsv)
 end
 
 @doc raw"""
@@ -189,11 +195,11 @@ Construct the estimator from the augmented covariance matrices `Q̂` and `R̂`.
 This syntax allows nonzero off-diagonal elements in ``\mathbf{Q̂, R̂}``.
 """
 function SteadyKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym, Q̂, R̂; direct=true
+    model::SM, i_ym, nint_u, nint_ym, Q̂, R̂; direct=true, verify_obsv=true
 ) where {NT<:Real, SM<:LinModel{NT}}
     Q̂, R̂ = to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂)
-    return SteadyKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov; direct)
+    return SteadyKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov; direct, verify_obsv)
 end
 
 """
@@ -340,14 +346,15 @@ struct KalmanFilter{
     prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function KalmanFilter{NT}(
-        model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true
+        model::SM, i_ym, nint_u, nint_ym, cov::KC; direct=true, verify_obsv=true
     ) where {NT<:Real, SM<:LinModel, KC<:KalmanCovariances}
         nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
+            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
@@ -407,6 +414,8 @@ This estimator is allocation-free.
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
+    `false` to disable this check.
 
 # Examples
 ```jldoctest
@@ -431,7 +440,8 @@ function KalmanFilter(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    verify_obsv = true,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -449,7 +459,7 @@ function KalmanFilter(
     P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
     R̂   = Diagonal([σR;].^2)
-    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
+    return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv)
 end
 
 @doc raw"""
@@ -460,11 +470,11 @@ Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` an
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function KalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true
+    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct=true, verify_obsv=true
 ) where {NT<:Real, SM<:LinModel{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
-    return KalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov; direct)
+    return KalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov; direct, verify_obsv)
 end
 
 @doc raw"""
@@ -566,14 +576,16 @@ struct UnscentedKalmanFilter{
     prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT}(
-        model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ; direct=true
+        model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ;
+        direct=true, verify_obsv=true
     ) where {NT<:Real, SM<:SimModelODE{NT}, KC<:KalmanCovariances}
         nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
+            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
@@ -658,6 +670,8 @@ This estimator is allocation-free if `model` simulations do not allocate.
 - `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
+    `false` to disable this check.
 
 # Examples
 ```jldoctest
@@ -691,7 +705,8 @@ function UnscentedKalmanFilter(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    verify_obsv = true,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -715,7 +730,9 @@ function UnscentedKalmanFilter(
     P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
     R̂   = Diagonal([σR;].^2)
-    return UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct)
+    return UnscentedKalmanFilter(
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct, verify_obsv
+    )
 end
 
 @doc raw"""
@@ -728,11 +745,14 @@ Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` an
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function UnscentedKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0; direct=true
+    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0;
+    direct=true, verify_obsv=true
 ) where {NT<:Real, SM<:SimModelODE{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
-    return UnscentedKalmanFilter{NT}(model, i_ym, nint_u, nint_ym, cov, α, β, κ; direct)
+    return UnscentedKalmanFilter{NT}(
+        model, i_ym, nint_u, nint_ym, cov, α, β, κ; direct, verify_obsv
+    )
 end
 
 
@@ -953,7 +973,8 @@ struct ExtendedKalmanFilter{
     function ExtendedKalmanFilter{NT}(
         model::SM, 
         i_ym, nint_u, nint_ym, cov::KC; 
-        jacobian::JB, linfuncF̂!::FF, linfuncĤ!::HF, direct=true
+        jacobian::JB, linfuncF̂!::FF, linfuncĤ!::HF,
+        direct=true, verify_obsv=true
     ) where {
             NT<:Real, 
             SM<:SimModelODE, 
@@ -967,7 +988,8 @@ struct ExtendedKalmanFilter{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
+            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
@@ -1058,7 +1080,8 @@ function ExtendedKalmanFilter(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    verify_obsv = true,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -1078,7 +1101,8 @@ function ExtendedKalmanFilter(
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
     R̂   = Diagonal([σR;].^2)
     return ExtendedKalmanFilter(
-        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, direct
+        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂;
+        jacobian, direct, verify_obsv
     )
 end
 
@@ -1092,13 +1116,15 @@ Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` an
 This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mathbf{Q̂, R̂}``.
 """
 function ExtendedKalmanFilter(
-    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian=AutoForwardDiff(), direct=true
+    model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂;
+    jacobian=AutoForwardDiff(), direct=true, verify_obsv=true
 ) where {NT<:Real, SM<:SimModelODE{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)    
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     linfuncF̂!, linfuncĤ! = get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     return ExtendedKalmanFilter{NT}(
-        model, i_ym, nint_u, nint_ym, cov; jacobian, linfuncF̂!, linfuncĤ!, direct
+        model, i_ym, nint_u, nint_ym, cov;
+        jacobian, linfuncF̂!, linfuncĤ!, direct, verify_obsv
     )
 end
 

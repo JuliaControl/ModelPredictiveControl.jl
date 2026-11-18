@@ -25,7 +25,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
     prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function Luenberger{NT, SM}(
-        model, i_ym, nint_u, nint_ym, poles; direct=true
+        model, i_ym, nint_u, nint_ym, poles; direct=true, verify_obsv=true
     ) where {NT<:Real, SM<:LinModel}
         nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
@@ -33,7 +33,8 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
+            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         K̂ = try
             ControlSystemsBase.place(Â, Ĉ, poles, :o; direct)[:, i_ym]
@@ -63,7 +64,8 @@ end
         nint_u  = 0,
         nint_ym = default_nint(model, i_ym),
         poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5,
-        direct = true
+        direct = true,
+        verify_obsv = true
     )
 
 Construct a Luenberger observer with the [`LinModel`](@ref) `model`.
@@ -98,11 +100,12 @@ function Luenberger(
     model::SM;
     i_ym::AbstractVector{Int}  = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
+    verify_obsv = true,
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
     poles = 1e-3*(1:(model.nx + sum(nint_u) + sum(nint_ym))) .+ 0.5,
     direct = true
 ) where{NT<:Real, SM<:LinModel{NT}}
-    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, poles; direct)
+    return Luenberger{NT, SM}(model, i_ym, nint_u, nint_ym, poles; direct, verify_obsv)
 end
 
 "Validate the quantity and stability of the Luenberger `poles`."

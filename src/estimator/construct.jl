@@ -375,8 +375,11 @@ julia> default_nint(model) |> println
 [1, 0, 1]
 ```
 """
-function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
+function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true)
     validate_ym(model, i_ym)
+    if !verify_obsv
+        return iszero(nint_u) ? fill(1, length(i_ym)) : fill(0, length(i_ym))
+    end
     nint_ym = fill(0, length(i_ym))
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
@@ -400,7 +403,7 @@ integrator on each measured output.
     Theres is no verification the augmented model remains observable. The resulting 
     [`StateEstimator`](@ref) object should be assessed separately with e.g.: [`sim!`](@ref). 
 """
-function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
+function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true)
     validate_ym(model, i_ym)
     nint_ym = iszero(nint_u) ? fill(1, length(i_ym)) : fill(0, length(i_ym))
     return nint_ym

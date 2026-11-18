@@ -56,6 +56,8 @@
     @test_throws ErrorException SteadyKalmanFilter(linmodel3, nint_ym=[1, 0, 0])
     model_unobs = LinModel([1 0;0 1.5], [1; 0], [1 0], zeros(2,0), zeros(1,0), 1.0)
     @test_throws ErrorException SteadyKalmanFilter(model_unobs, nint_ym=[1])
+    @test_throws ErrorException KalmanFilter(model_unobs, nint_ym=[1], verify_obsv=true)
+    @test isa(KalmanFilter(model_unobs, nint_ym=[1], verify_obsv=false), KalmanFilter)
     @test_throws ErrorException SteadyKalmanFilter(LinModel(tf(1,[10, 1]), 1.0), 1:1, 0, 0, [-1], [1])
     @test_throws ErrorException SteadyKalmanFilter(LinModel(tf(1, [1,0]), 1), nint_ym=[1])
     @test_throws ErrorException SteadyKalmanFilter(linmodel, nint_u=[1,1], nint_ym=[1,1])
