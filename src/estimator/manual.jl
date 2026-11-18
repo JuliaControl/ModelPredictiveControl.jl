@@ -103,7 +103,7 @@ ManualEstimator estimator with a sample time Ts = 0.5 s:
     julia> function man_sim()
                f(x,u,_,_) = 0.5*sin.(x + u)
                h(x,_,_) = x
-               model = NonLinModel(f, h, 100.0, 1, 1, 1, solver=nothing)
+               model = NonLinModel(f, h, 1000.0, 1, 1, 1, solver=nothing)
                linModel = linearize(model, x=[0], u=[0])
                man = ManualEstimator(linModel, nint_u=[1])
                mpc = LinMPC(man)
