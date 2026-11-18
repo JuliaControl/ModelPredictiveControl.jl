@@ -379,10 +379,10 @@ julia> default_nint(model) |> println
 """
 function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true)
     validate_ym(model, i_ym)
-    if !verify_obsv
-        return iszero(nint_u) ? fill(1, length(i_ym)) : fill(0, length(i_ym))
-    end
-    nint_ym = fill(0, length(i_ym))
+    nym = length(i_ym)
+    verify_obsv || return iszero(nint_u) ? fill(1, nym) : fill(0, nym)
+    nint_ym = fill(0, nym)
+    if verify_obsv
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
         As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
