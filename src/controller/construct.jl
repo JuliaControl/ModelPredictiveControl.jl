@@ -854,13 +854,18 @@ end
 "Check the condition number of `H̃` and display a `@warn` if `cond(H̃) > warn_cond`."
 function verify_cond(::SingleShooting, H̃, warn_cond)
     if !isinf(warn_cond)
-        cond_H̃ = cond(H̃)
+        cond_H̃ = try
+            cond(H̃)
+        catch
+            NaN
+        end 
         cond_H̃ > warn_cond && @warn(
             "The Hessian condition number cond_H̃ > $warn_cond. The optimization " *
             "problem may be ill-conditioned.\n Consider changing the tunings, using " *
             "MultipleShooting, or using an optimizer more robust to this like DAQP.",
             cond_H̃,
         )
+        isnan(cond_H̃) && @warn("could not validate the condition number of the QP Hessian.")
     end
     return nothing
 end
