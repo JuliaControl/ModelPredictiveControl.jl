@@ -158,7 +158,7 @@ struct MovingHorizonEstimator{
         gc!::GCfunc, nc, p::PT,
         transcription::TM, optim::JM, 
         gradient::GB, jacobian::JB, hessian::HB, covestim::CE;
-        direct=true, verify_obsv=true
+        direct=true
     ) where {
             NT<:Real, 
             SM<:SimModel{NT}, 
@@ -182,8 +182,7 @@ struct MovingHorizonEstimator{
         nxs = size(As, 1)
         nx̂ = model.nx + nxs
         nŵ = nx̂
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         lastu0 = zeros(NT, nu)
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
@@ -557,8 +556,7 @@ function MovingHorizonEstimator(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    verify_obsv = true,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -591,7 +589,7 @@ function MovingHorizonEstimator(
     return MovingHorizonEstimator(
         model, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, Cwt;
         gc, gc!, nc, p, 
-        transcription, optim, gradient, jacobian, hessian, covestim, direct, verify_obsv
+        transcription, optim, gradient, jacobian, hessian, covestim, direct
     )
 end
 
@@ -607,8 +605,7 @@ end
         jacobian=AutoForwardDiff(),
         hessian=false,
         covestim=nothing,
-        direct=true,
-        verify_obsv=true,
+        direct=true
     )
 
 Construct the estimator from the augmented covariance matrices `P̂_0`, `Q̂` and `R̂`.
@@ -629,8 +626,7 @@ function MovingHorizonEstimator(
     jacobian::AbstractADType = default_jacobian(transcription),
     hessian::Union{AbstractADType, Bool, Nothing} = false,
     covestim::Union{StateEstimator, Nothing} = nothing,
-    direct = true,
-    verify_obsv = true,
+    direct = true
 ) where {NT<:Real, SM<:SimModel{NT}, JM<:JuMP.GenericModel}
     if isnothing(P̂_0)
         if isnothing(covestim)
@@ -644,7 +640,7 @@ function MovingHorizonEstimator(
     hessian = validate_hessian(hessian, DEFAULT_NONLINMHE_HESSIAN, gradient)
     if isnothing(covestim)
         covestim = default_covestim_mhe(
-            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv
+            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv=false
         )
     end
     validate_covestim(cov, covestim)
@@ -654,7 +650,7 @@ function MovingHorizonEstimator(
         He, i_ym, nint_u, nint_ym, cov, Cwt,
         gc!, nc, p,
         transcription, optim, gradient, jacobian, hessian, covestim; 
-        direct, verify_obsv
+        direct
     )
 end
 
