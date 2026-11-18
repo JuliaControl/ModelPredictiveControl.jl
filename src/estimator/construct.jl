@@ -359,7 +359,7 @@ function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) whe
 end
 
 @doc raw"""
-    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0) -> nint_ym
+    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0, verify_obsv=true) -> nint_ym
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
@@ -367,7 +367,7 @@ The arguments `i_ym` and `nint_u` are the measured output indices and the integr
 quantity on each manipulated input, respectively. By default, one integrator is added on
 each measured outputs. If ``\mathbf{Â, Ĉ}`` matrices of the augmented model become
 unobservable, the integrator is removed. This approach works well for stable, integrating
-and unstable `model` (see Examples).
+and unstable `model` (see Examples). The observability checkup is skipped if `!verify_obsv`.
 
 # Examples
 ```jldoctest
