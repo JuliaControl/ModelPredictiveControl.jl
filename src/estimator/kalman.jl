@@ -114,8 +114,6 @@ state of the next time step ``\mathbf{x̂}_k(k+1)``. This estimator is allocatio
    estimator, in opposition to the delayed/predictor form).
 - `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
     `false` to disable this check.
-- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
-    `false` to disable this check.
 
 # Examples
 ```jldoctest
