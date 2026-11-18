@@ -90,17 +90,12 @@ struct KalmanCovariances{
         Q̂::Q̂C, R̂::R̂C, P̂_0, He
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
         if isnothing(P̂_0)
-            P̂_0 = zeros(NT, 0, 0)    # does not apply to steady-state Kalman filter
-            P̂   = zeros(NT, size(Q̂)) # will hold the steady-state error covariance
+            P̂_0  = Hermitian(zeros(NT, 0, 0), :L) # don't apply to SteadyKalmanFilter
+            P̂    = Hermitian(zeros(NT, size(Q̂)), :L) # will hold the steady-state error covariance
+            invP̄ = copy(P̂_0)
         else
-            P̂   = copy(P̂_0)
-        end
-        P̂_0 = Hermitian(P̂_0, :L)
-        P̂   = Hermitian(P̂, :L)
-        Q̂   = Hermitian(Q̂, :L)
-        R̂   = Hermitian(R̂, :L)
-        # the following variables are only for the moving horizon estimator:
-        invP̄, invQ̂, invR̂ = copy(P̂_0), copy(Q̂), copy(R̂)
+            P̂_0     = Hermitian(P̂_0, :L)
+            P̂, invP̄ = copy(P̂_0), copy(P̂_0)
         try
             inv!(invP̄)
         catch err
@@ -110,6 +105,13 @@ struct KalmanCovariances{
                 rethrow()
             end
         end
+        end
+        P̂_0 = Hermitian(P̂_0, :L)
+        P̂   = Hermitian(P̂, :L)
+        Q̂   = Hermitian(Q̂, :L)
+        R̂   = Hermitian(R̂, :L)
+        # the following variables are only for the moving horizon estimator:
+        invQ̂, invR̂ = copy(Q̂), copy(R̂)
         try
             inv!(invQ̂)
         catch err
