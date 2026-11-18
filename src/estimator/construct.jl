@@ -359,7 +359,7 @@ function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) whe
 end
 
 @doc raw"""
-    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0, verify_obsv=true) -> nint_ym
+    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true) -> nint_ym
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
