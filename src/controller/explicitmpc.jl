@@ -167,11 +167,16 @@ function ExplicitMPC(
     L_Hp = Diagonal(repeat(Lwt, Hp)),
 ) where {NT<:Real, SE<:StateEstimator{NT}}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
-    nk = estimate_delays(estim.model)
+    nk = try
+        estimate_delays(estim.model)
+    catch myerr
+        NaN
+    end
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
+    isnan(nk) && @warn("could not estimate the model delay, Hp ($Hp) might be too small.")
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp)
