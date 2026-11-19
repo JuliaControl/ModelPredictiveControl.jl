@@ -347,6 +347,7 @@ end
 Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref).
 """
 function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) where NT<:Real
+    verify_obsv && error("observability verification of non-LinModel is not supported.")
     nu, nx, nd, ny = model.nu, model.nx, model.nd, model.ny
     nxs = size(As, 1)
     Â   = zeros(NT, 0, nx+nxs)

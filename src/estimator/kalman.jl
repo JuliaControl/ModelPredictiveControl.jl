@@ -40,8 +40,7 @@ struct SteadyKalmanFilter{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         R̂, Q̂ = cov.R̂, cov.Q̂
         K̂, P̂ = init_skf(i_ym, Â, Ĉ, Q̂, R̂; direct)
@@ -350,8 +349,7 @@ struct KalmanFilter{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
@@ -572,16 +570,14 @@ struct UnscentedKalmanFilter{
     prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function UnscentedKalmanFilter{NT}(
-        model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ;
-        direct=true, verify_obsv=true
+        model::SM, i_ym, nint_u, nint_ym, cov::KC, α, β, κ; direct=true
     ) where {NT<:Real, SM<:SimModelODE{NT}, KC<:KalmanCovariances}
         nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         nσ, γ, m̂, Ŝ = init_ukf(nx̂, α, β, κ)
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]

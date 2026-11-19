@@ -33,8 +33,7 @@ struct Luenberger{NT<:Real, SM<:LinModel} <: StateEstimator{NT}
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y; verify_obsv)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         K̂ = try
             ControlSystemsBase.place(Â, Ĉ, poles, :o; direct)[:, i_ym]
