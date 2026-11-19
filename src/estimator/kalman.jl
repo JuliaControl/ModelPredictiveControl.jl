@@ -112,8 +112,7 @@ state of the next time step ``\mathbf{x̂}_k(k+1)``. This estimator is allocatio
     disturbances at measured outputs ``\mathbf{Q_{int_{ym}}}`` (composed of integrators).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
-- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
-    `false` to disable this check.
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
@@ -412,8 +411,7 @@ This estimator is allocation-free.
     disturbances at measured outputs ``\mathbf{P_{int_{ym}}}(0)`` (composed of integrators).
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
-- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
-    `false` to disable this check.
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
@@ -668,8 +666,7 @@ This estimator is allocation-free if `model` simulations do not allocate.
 - `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
-- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref). Set to
-    `false` to disable this check.
+- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref).
 
 # Examples
 ```jldoctest

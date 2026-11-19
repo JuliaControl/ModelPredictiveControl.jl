@@ -382,7 +382,6 @@ function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=tr
     nym = length(i_ym)
     verify_obsv || return iszero(nint_u) ? fill(1, nym) : fill(0, nym)
     nint_ym = fill(0, nym)
-    if verify_obsv
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
         As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -394,7 +393,7 @@ function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=tr
 end
 
 """
-    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0) -> nint_ym
+    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0; verify_obsv=false) -> nint_ym
 
 One integrator on each measured output by default for other cases e.g. [`NonLinModel`](@ref).
 
@@ -405,7 +404,8 @@ integrator on each measured output.
     Theres is no verification the augmented model remains observable. The resulting 
     [`StateEstimator`](@ref) object should be assessed separately with e.g.: [`sim!`](@ref). 
 """
-function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true)
+function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0; verify_obsv=false)
+    verify_obsv && error("observability verification of non-LinModel is not supported.")
     validate_ym(model, i_ym)
     nint_ym = iszero(nint_u) ? fill(1, length(i_ym)) : fill(0, length(i_ym))
     return nint_ym
