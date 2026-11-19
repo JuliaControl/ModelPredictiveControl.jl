@@ -639,9 +639,7 @@ function MovingHorizonEstimator(
     gc! = get_mutating_gc_mhe(NT, gc)
     hessian = validate_hessian(hessian, DEFAULT_NONLINMHE_HESSIAN, gradient)
     if isnothing(covestim)
-        covestim = default_covestim_mhe(
-            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv=false
-        )
+        covestim = default_covestim_mhe(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     end
     validate_covestim(cov, covestim)
     setstate!(covestim, covestim.x̂0 + covestim.x̂op, P̂_0)
@@ -664,18 +662,11 @@ function default_optim_mhe(model::SimModel, nc)
 end
 
 "Default arrival covariance estimator for MHE, depending on the model type only."
-function default_covestim_mhe(
-    model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂;
-    direct, verify_obsv=true
-)
+function default_covestim_mhe(model::SimModel, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     if model isa LinModel
-        return KalmanFilter(
-            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv
-        )
+        return KalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     elseif model isa NonLinModel
-        return UnscentedKalmanFilter(
-            model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct, verify_obsv
-        )
+        return UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; direct)
     else
         # SteadyKalmanFilter with arbitrary LinModel (will be ignored):
         nx, nu, ny = model.nx, model.nu, model.ny
@@ -684,7 +675,7 @@ function default_covestim_mhe(
         Bu, C = ones(nx, nu), ones(ny, nx)
         dummy_model = LinModel(A, Bu, C, 0, 0, model.Ts)
         return SteadyKalmanFilter(
-            dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct, verify_obsv
+            dummy_model, i_ym, nint_u, nint_ym, Q̂, R̂; direct, verify_obsv=false
         )
     end
 end
