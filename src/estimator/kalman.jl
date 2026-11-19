@@ -666,7 +666,6 @@ This estimator is allocation-free if `model` simulations do not allocate.
 - `κ=0` or *`kappa`* : kappa parameter, another spread parameter ``(0 ≤ κ ≤ 3)``.
 - `direct=true`: construct with a direct transmission from ``\mathbf{y^m}`` (a.k.a. current
    estimator, in opposition to the delayed/predictor form).
-- `verify_obsv=true`: verify observability of the augmented [`LinModel`](@ref).
 
 # Examples
 ```jldoctest
@@ -700,8 +699,7 @@ function UnscentedKalmanFilter(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    verify_obsv = true,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -725,9 +723,7 @@ function UnscentedKalmanFilter(
     P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
     R̂   = Diagonal([σR;].^2)
-    return UnscentedKalmanFilter(
-        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct, verify_obsv
-    )
+    return UnscentedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α, β, κ; direct)
 end
 
 @doc raw"""
@@ -741,12 +737,12 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 function UnscentedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂, α=1e-3, β=2, κ=0;
-    direct=true, verify_obsv=true
+    direct=true
 ) where {NT<:Real, SM<:SimModelODE{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     return UnscentedKalmanFilter{NT}(
-        model, i_ym, nint_u, nint_ym, cov, α, β, κ; direct, verify_obsv
+        model, i_ym, nint_u, nint_ym, cov, α, β, κ; direct
     )
 end
 
@@ -969,7 +965,7 @@ struct ExtendedKalmanFilter{
         model::SM, 
         i_ym, nint_u, nint_ym, cov::KC; 
         jacobian::JB, linfuncF̂!::FF, linfuncĤ!::HF,
-        direct=true, verify_obsv=true
+        direct=true
     ) where {
             NT<:Real, 
             SM<:SimModelODE, 
@@ -983,8 +979,7 @@ struct ExtendedKalmanFilter{
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0 = [zeros(NT, model.nx); zeros(NT, nxs)]
         K̂ = zeros(NT, nx̂, nym)
@@ -1075,8 +1070,7 @@ function ExtendedKalmanFilter(
     sigmaQ   = fill(1/model.nx, model.nx),
     sigmaR   = fill(1, length(i_ym)),
     nint_u ::IntVectorOrInt = 0,
-    verify_obsv = true,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
     sigmaPint_u_0  = fill(1, max(sum(nint_u),  0)),
     sigmaQint_u    = fill(1, max(sum(nint_u),  0)),
     sigmaPint_ym_0 = fill(1, max(sum(nint_ym), 0)),
@@ -1095,10 +1089,7 @@ function ExtendedKalmanFilter(
     P̂_0 = Diagonal([σP_0; σPint_u_0; σPint_ym_0].^2)
     Q̂   = Diagonal([σQ;  σQint_u;  σQint_ym ].^2)
     R̂   = Diagonal([σR;].^2)
-    return ExtendedKalmanFilter(
-        model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂;
-        jacobian, direct, verify_obsv
-    )
+    return ExtendedKalmanFilter(model, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂; jacobian, direct)
 end
 
 @doc raw"""
@@ -1112,14 +1103,13 @@ This syntax allows nonzero off-diagonal elements in ``\mathbf{P̂}_{-1}(0), \mat
 """
 function ExtendedKalmanFilter(
     model::SM, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂;
-    jacobian=AutoForwardDiff(), direct=true, verify_obsv=true
+    jacobian=AutoForwardDiff(), direct=true
 ) where {NT<:Real, SM<:SimModelODE{NT}}
     P̂_0, Q̂, R̂ = to_mat(P̂_0), to_mat(Q̂), to_mat(R̂)    
     cov = KalmanCovariances(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     linfuncF̂!, linfuncĤ! = get_ekf_linfuncs(NT, model, i_ym, nint_u, nint_ym, jacobian)
     return ExtendedKalmanFilter{NT}(
-        model, i_ym, nint_u, nint_ym, cov;
-        jacobian, linfuncF̂!, linfuncĤ!, direct, verify_obsv
+        model, i_ym, nint_u, nint_ym, cov; jacobian, linfuncF̂!, linfuncĤ!, direct
     )
 end
 
