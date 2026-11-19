@@ -24,15 +24,14 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
     prepared::Vector{Bool}
     buffer::StateEstimatorBuffer{NT}
     function ManualEstimator{NT}(
-        model::SM, i_ym, nint_u, nint_ym; verify_obsv=true
+        model::SM, i_ym, nint_u, nint_ym
     ) where {NT<:Real, SM<:SimModel{NT}}
         nu, ny, nd, nk̄ = model.nu, model.ny, model.nd, model.nk̄
         nym, nyu = validate_ym(model, i_ym)
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op =
-            augment_model(model, As, Cs_u, Cs_y; verify_obsv)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y; verify_obsv=false)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         direct = false
@@ -72,8 +71,6 @@ examples.
     the manipulated inputs (vector), use `nint_u=0` for no integrator (see Extended Help).
 - `nint_ym=default_nint(model,i_ym,nint_u)` : same than `nint_u` but for the unmeasured 
     disturbances at the measured outputs, use `nint_ym=0` for no integrator (see Extended Help).
-- `verify_obsv=true`: verify observability of the augmented model when `model` is a
-    [`LinModel`](@ref). Set it to `false` to disable this check.
 
 # Examples
 ```jldoctest
@@ -142,10 +139,9 @@ function ManualEstimator(
     model::SM;
     i_ym::AbstractVector{Int} = 1:model.ny,
     nint_u ::IntVectorOrInt = 0,
-    verify_obsv = true,
-    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u; verify_obsv),
+    nint_ym::IntVectorOrInt = default_nint(model, i_ym, nint_u),
 ) where {NT<:Real, SM<:SimModel{NT}}
-    return ManualEstimator{NT}(model, i_ym, nint_u, nint_ym; verify_obsv)
+    return ManualEstimator{NT}(model, i_ym, nint_u, nint_ym)
 end
 
 """
