@@ -725,6 +725,26 @@ end
     @test ym ≈ r   atol=1e-2 
 end
 
+@testitem "ExplicitMPC autodiff" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using ForwardDiff
+
+    A  = [0.9 0.08; -0.15 0.75]
+    Bu = [0.005, 0.09]
+    C  = [1.0 0.0]
+    function first_move(Nwt)
+        T = typeof(Nwt)
+        model = LinModel{T}(A, Bu, C, 0, 0, 0.1)
+        estim = KalmanFilter(model, nint_ym=0, verify_obsv=false)
+        mpc = ExplicitMPC(estim; Hp=20, Hc=2)
+        preparestate!(mpc, [0.0])
+        return moveinput!(mpc, [1.0])[1]
+    end
+    @test_nowarn first_move(0.5)
+    @test_nowarn ForwardDiff.derivative(first_move, 0.5)
+
+end
+
 @testitem "ExplicitMPC other methods" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel1 = setop!(LinModel(sys,Ts,i_u=[1,2]), uop=[10,50], yop=[50,30])

@@ -90,17 +90,12 @@ struct KalmanCovariances{
         Q̂::Q̂C, R̂::R̂C, P̂_0, He
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
         if isnothing(P̂_0)
-            P̂_0 = zeros(NT, 0, 0)    # does not apply to steady-state Kalman filter
-            P̂   = zeros(NT, size(Q̂)) # will hold the steady-state error covariance
+            P̂_0  = Hermitian(zeros(NT, 0, 0), :L) # don't apply to SteadyKalmanFilter
+            P̂    = Hermitian(zeros(NT, size(Q̂)), :L) # will hold the steady-state error covariance
+            invP̄ = copy(P̂_0)
         else
-            P̂   = copy(P̂_0)
-        end
-        P̂_0 = Hermitian(P̂_0, :L)
-        P̂   = Hermitian(P̂, :L)
-        Q̂   = Hermitian(Q̂, :L)
-        R̂   = Hermitian(R̂, :L)
-        # the following variables are only for the moving horizon estimator:
-        invP̄, invQ̂, invR̂ = copy(P̂_0), copy(Q̂), copy(R̂)
+            P̂_0     = Hermitian(P̂_0, :L)
+            P̂, invP̄ = copy(P̂_0), copy(P̂_0)
         try
             inv!(invP̄)
         catch err
@@ -110,6 +105,13 @@ struct KalmanCovariances{
                 rethrow()
             end
         end
+        end
+        P̂_0 = Hermitian(P̂_0, :L)
+        P̂   = Hermitian(P̂, :L)
+        Q̂   = Hermitian(Q̂, :L)
+        R̂   = Hermitian(R̂, :L)
+        # the following variables are only for the moving horizon estimator:
+        invQ̂, invR̂ = copy(Q̂), copy(R̂)
         try
             inv!(invQ̂)
         catch err
@@ -345,6 +347,7 @@ end
 Return empty matrices, and `x̂op` & `f̂op` vectors, if `model` is not a [`LinModel`](@ref).
 """
 function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) where NT<:Real
+    verify_obsv && error("observability verification of non-LinModel is not supported.")
     nu, nx, nd, ny = model.nu, model.nx, model.nd, model.ny
     nxs = size(As, 1)
     Â   = zeros(NT, 0, nx+nxs)
@@ -357,7 +360,7 @@ function augment_model(model::SimModel{NT}, As, args... ; verify_obsv=false) whe
 end
 
 @doc raw"""
-    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0) -> nint_ym
+    default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true) -> nint_ym
 
 Get default integrator quantity per measured outputs `nint_ym` for [`LinModel`](@ref).
 
@@ -365,7 +368,7 @@ The arguments `i_ym` and `nint_u` are the measured output indices and the integr
 quantity on each manipulated input, respectively. By default, one integrator is added on
 each measured outputs. If ``\mathbf{Â, Ĉ}`` matrices of the augmented model become
 unobservable, the integrator is removed. This approach works well for stable, integrating
-and unstable `model` (see Examples).
+and unstable `model` (see Examples). The observability checkup is skipped if `!verify_obsv`.
 
 # Examples
 ```jldoctest
@@ -375,9 +378,11 @@ julia> default_nint(model) |> println
 [1, 0, 1]
 ```
 """
-function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
+function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0; verify_obsv=true)
     validate_ym(model, i_ym)
-    nint_ym = fill(0, length(i_ym))
+    nym = length(i_ym)
+    verify_obsv || return iszero(nint_u) ? fill(1, nym) : fill(0, nym)
+    nint_ym = fill(0, nym)
     for i in eachindex(i_ym)
         nint_ym[i]  = 1
         As, Cs_u, Cs_y = init_estimstoch(model, i_ym, nint_u, nint_ym)
@@ -389,7 +394,7 @@ function default_nint(model::LinModel, i_ym=1:model.ny, nint_u=0)
 end
 
 """
-    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0) -> nint_ym
+    default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0; verify_obsv=false) -> nint_ym
 
 One integrator on each measured output by default for other cases e.g. [`NonLinModel`](@ref).
 
@@ -400,7 +405,8 @@ integrator on each measured output.
     Theres is no verification the augmented model remains observable. The resulting 
     [`StateEstimator`](@ref) object should be assessed separately with e.g.: [`sim!`](@ref). 
 """
-function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0)
+function default_nint(model::SimModel, i_ym=1:model.ny, nint_u=0; verify_obsv=false)
+    verify_obsv && error("observability verification of non-LinModel is not supported.")
     validate_ym(model, i_ym)
     nint_ym = iszero(nint_u) ? fill(1, length(i_ym)) : fill(0, length(i_ym))
     return nint_ym

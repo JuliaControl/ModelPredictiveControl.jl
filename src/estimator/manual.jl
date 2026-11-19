@@ -31,7 +31,7 @@ struct ManualEstimator{NT<:Real, SM<:SimModel} <: StateEstimator{NT}
         As, Cs_u, Cs_y, nint_u, nint_ym = init_estimstoch(model, i_ym, nint_u, nint_ym)
         nxs = size(As, 1)
         nx̂  = model.nx + nxs
-        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y)
+        Â, B̂u, Ĉ, B̂d, D̂d, x̂op, f̂op = augment_model(model, As, Cs_u, Cs_y; verify_obsv=false)
         Ĉm, D̂dm = Ĉ[i_ym, :], D̂d[i_ym, :]
         x̂0  = [zeros(NT, model.nx); zeros(NT, nxs)]
         direct = false
