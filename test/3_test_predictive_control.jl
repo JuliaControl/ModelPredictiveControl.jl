@@ -736,7 +736,7 @@ end
         T = typeof(Nwt)
         model = LinModel{T}(A, Bu, C, 0, 0, 0.1)
         estim = KalmanFilter(model, nint_ym=0, verify_obsv=false)
-        mpc = ExplicitMPC(estim; Hp=20, Hc=2)
+        mpc = ExplicitMPC(estim; Hp=20, Hc=2, Nwt=[Nwt])
         preparestate!(mpc, [0.0])
         return moveinput!(mpc, [1.0])[1]
     end
