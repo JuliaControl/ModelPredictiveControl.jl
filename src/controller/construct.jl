@@ -97,7 +97,9 @@ function ControllerWeights(
     model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
 ) where {NT<:Real}
     validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    M_Hp, N_Hc, L_Hp = NT.(M_Hp), NT.(N_Hc), NT.(L_Hp)
+    M_Hp = eltype(M_Hp) == NT ? M_Hp : NT.(M_Hp)
+    N_Hc = eltype(N_Hc) == NT ? N_Hc : NT.(N_Hc)
+    L_Hp = eltype(L_Hp) == NT ? L_Hp : NT.(L_Hp)
     return ControllerWeights{NT}(M_Hp, N_Hc, L_Hp, Cwt, Ewt)
 end
 
