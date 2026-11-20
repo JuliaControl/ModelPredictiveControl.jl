@@ -85,10 +85,6 @@ struct ControllerWeights{
         iszero_Ñ_Hc = [iszero(Ñ_Hc)]
         iszero_L_Hp = [iszero(L_Hp)]
         iszero_E = iszero(E)
-        @show typeof(M_Hp)
-        @show MW
-        @show Hermitian{NT,MW}
-        @show Hermitian{NT,NW}
         return new{NT,MW,NW,LW}(
             M_Hp, Ñ_Hc, L_Hp, E,
             iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E, isinf_C
