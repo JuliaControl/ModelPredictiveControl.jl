@@ -85,6 +85,10 @@ struct ControllerWeights{
         iszero_Ñ_Hc = [iszero(Ñ_Hc)]
         iszero_L_Hp = [iszero(L_Hp)]
         iszero_E = iszero(E)
+        @show typeof(M_Hp)
+        @show MW
+        @show Hermitian{NT,MW}
+        @show Hermitian{NT,NW}
         return new{NT,MW,NW,LW}(
             M_Hp, Ñ_Hc, L_Hp, E,
             iszero_M_Hp, iszero_Ñ_Hc, iszero_L_Hp, iszero_E, isinf_C
@@ -100,6 +104,10 @@ function ControllerWeights(
     M_Hp = eltype(M_Hp) == NT ? M_Hp : NT.(M_Hp)
     N_Hc = eltype(N_Hc) == NT ? N_Hc : NT.(N_Hc)
     L_Hp = eltype(L_Hp) == NT ? L_Hp : NT.(L_Hp)
+    # Hermitian wrappers are added in the inner constructor, remove it to avoid duplicates: 
+    M_Hp = M_Hp isa Hermitian ? parent(M_Hp) : M_Hp
+    N_Hc = N_Hc isa Hermitian ? parent(N_Hc) : N_Hc
+    L_Hp = L_Hp isa Hermitian ? parent(L_Hp) : L_Hp
     return ControllerWeights{NT}(M_Hp, N_Hc, L_Hp, Cwt, Ewt)
 end
 
