@@ -97,7 +97,13 @@ function ControllerWeights(
     model::SimModel{NT}, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt=Inf, Ewt=0
 ) where {NT<:Real}
     validate_weights(model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt, Ewt)
-    M_Hp, N_Hc, L_Hp = NT.(M_Hp), NT.(N_Hc), NT.(L_Hp)
+    M_Hp = eltype(M_Hp) == NT ? M_Hp : NT.(M_Hp)
+    N_Hc = eltype(N_Hc) == NT ? N_Hc : NT.(N_Hc)
+    L_Hp = eltype(L_Hp) == NT ? L_Hp : NT.(L_Hp)
+    # Hermitian wrappers are added in the inner constructor, remove it to avoid duplicates: 
+    M_Hp = M_Hp isa Hermitian ? parent(M_Hp) : M_Hp
+    N_Hc = N_Hc isa Hermitian ? parent(N_Hc) : N_Hc
+    L_Hp = L_Hp isa Hermitian ? parent(L_Hp) : L_Hp
     return ControllerWeights{NT}(M_Hp, N_Hc, L_Hp, Cwt, Ewt)
 end
 
