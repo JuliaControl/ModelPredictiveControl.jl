@@ -141,8 +141,15 @@ function KalmanCovariances(
         model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=1
     ) where {NT<:Real}
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
-    Q̂, R̂ = NT.(Q̂), NT.(R̂)
-    !isnothing(P̂_0) && (P̂_0 = NT.(P̂_0))
+    Q̂ = eltype(Q̂) == NT ? Q̂ : NT.(Q̂)
+    R̂ = eltype(R̂) == NT ? R̂ : NT.(R̂)
+    # Hermitian wrappers are added in the inner constructor, remove it to avoid duplicates: 
+    Q̂ = Q̂ isa Hermitian ? parent(Q̂) : Q̂
+    R̂ = R̂ isa Hermitian ? parent(R̂) : R̂
+    if !isnothing(P̂_0) 
+        P̂_0 = eltype(P̂_0) == NT ? P̂_0 : NT.(P̂_0)
+        P̂_0 = P̂_0 isa Hermitian ? parent(P̂_0) : P̂_0
+    end
     return KalmanCovariances{NT}(Q̂, R̂, P̂_0, He)
 end
 
