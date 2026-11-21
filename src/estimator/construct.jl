@@ -96,15 +96,15 @@ struct KalmanCovariances{
         else
             P̂_0     = Hermitian(P̂_0, :L)
             P̂, invP̄ = copy(P̂_0), copy(P̂_0)
-        try
-            inv!(invP̄)
-        catch err
-            if err isa PosDefException
-                error("P̂_0 is not positive definite")
-            else
-                rethrow()
+            try
+                inv!(invP̄)
+            catch err
+                if err isa PosDefException
+                    error("P̂_0 is not positive definite")
+                else
+                    rethrow()
+                end
             end
-        end
         end
         P̂_0 = Hermitian(P̂_0, :L)
         P̂   = Hermitian(P̂, :L)
