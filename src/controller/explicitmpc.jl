@@ -190,7 +190,7 @@ setconstraint!(::ExplicitMPC; kwargs...) = error("ExplicitMPC does not support c
 
 function Base.show(io::IO, mpc::ExplicitMPC)
     estim, model = mpc.estim, mpc.estim.model
-    Hp, Hc, nϵ = mpc.Hp, mpc.Hc, mpc.nϵ
+    Hp, Hc = mpc.Hp, mpc.Hc
     nu, nd = model.nu, model.nd
     nx̂, nym, nyu = estim.nx̂, estim.nym, estim.nyu
     n = maximum(ndigits.((Hp, Hc, nu, nx̂, nym, nyu, nd))) + 1
