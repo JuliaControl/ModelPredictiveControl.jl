@@ -573,11 +573,23 @@ reset_nonlincon!(::PredictiveController) = nothing
 Estimate the default prediction horizon `Hp` for [`LinModel`](@ref).
 """
 default_Hp(model::LinModel) = DEFAULT_HP0 + estimate_delays(model)
-"Throw an error when model is not a [`LinModel`](@ref)."
+"Throw an error when `model` is not a [`LinModel`](@ref)."
 function default_Hp(::SimModelODE)
     msg = "Prediction horizon Hp must be explicitly specified if model is not a LinModel."
     throw(ArgumentError(msg))
 end
+
+"Warn if `Hp ≤ nk`, where `nk` is the estimated delays `model`."
+function verify_delays(model::LinModel, Hp)
+    nk = estimate_delays(model)
+    if Hp ≤ nk
+        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
+              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
+    end
+    return nothing
+end
+"Do nothing when `model` is not a [`LinModel`](@ref)."
+verify_delays(::SimModel, _ ) = nothing
 
 """
     estimate_delays(model::LinModel)

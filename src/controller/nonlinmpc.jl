@@ -449,11 +449,7 @@ function NonLinMPC(
     NT<:Real, 
     SE<:StateEstimator{NT}
 }
-    nk = estimate_delays(estim.model)
-    if Hp ≤ nk
-        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
-              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
-    end
+    verify_delays(estim.model, Hp)
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     validate_JE(NT, JE)
