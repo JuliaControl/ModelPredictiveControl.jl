@@ -581,11 +581,16 @@ end
 
 "Warn if `Hp ≤ nk`, where `nk` is the estimated delays `model`."
 function verify_delays(model::LinModel, Hp)
-    nk = estimate_delays(model)
+    nk = try
+        estimate_delays(model)
+    catch
+        NaN
+    end
     if Hp ≤ nk
         @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
               "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
     end
+    isnan(nk) && @warn("could not estimate the model delay, Hp ($Hp) might be too small.")
     return nothing
 end
 "Do nothing when `model` is not a [`LinModel`](@ref)."
