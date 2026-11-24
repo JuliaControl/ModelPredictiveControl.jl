@@ -846,6 +846,7 @@ function init_quadprog(
 )
     M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
     H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃Δu'*Ñ_Hc*P̃Δu + P̃u'*L_Hp*P̃u), :L)
+    warn_cond = isinf(warn_cond) ? nothing : warn_cond
     verify_cond(transcription, H̃, warn_cond)
     return H̃
 end
@@ -858,20 +859,19 @@ function init_quadprog(
 end
 
 "Check the condition number of `H̃` and display a `@warn` if `cond(H̃) > warn_cond`."
-function verify_cond(::SingleShooting, H̃, warn_cond)
-    if !isinf(warn_cond)
-        cond_H̃ = cond(H̃)
-        cond_H̃ > warn_cond && @warn(
-            "The Hessian condition number cond_H̃ > $warn_cond. The optimization " *
-            "problem may be ill-conditioned.\n Consider changing the tunings, using " *
-            "MultipleShooting, or using an optimizer more robust to this like DAQP.",
-            cond_H̃,
-        )
-    end
+function verify_cond(::SingleShooting, H̃, warn_cond::Real)
+    cond_H̃ = cond(H̃)
+    cond_H̃ > warn_cond && @warn(
+        "The Hessian condition number cond_H̃ > $warn_cond. The optimization " *
+        "problem may be ill-conditioned.\n Consider changing the tunings, using " *
+        "MultipleShooting, or using an optimizer more robust to this like DAQP.",
+        cond_H̃,
+    )
     return nothing
 end
-"No check if `transcription` is not a `SingleShooting`."
-verify_cond(::TranscriptionMethod, _, _) = nothing
+"No check if `transcription` is not a `SingleShooting` or `isnothing(warn_cond)`."
+verify_cond(::TranscriptionMethod, _ , ::Any) = nothing
+verify_cond(::SingleShooting, _ ,  ::Nothing) = nothing
 
 """
     init_defaultcon_mpc(

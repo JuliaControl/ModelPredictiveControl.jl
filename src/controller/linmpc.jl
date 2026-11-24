@@ -170,7 +170,7 @@ arguments. This controller allocates memory at each time step for the optimizati
   the predictive controller, provided as a [`JuMP.Model`](@extref) object (default to 
   [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
 - `warn_cond=1e6` : warn if the condition number of the quadratic Hessian exceeds this
-  value, use `warn_cond=Inf` to skip the check.
+  value, use `warn_cond=Inf` or `nothing` to skip the check.
 - additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
