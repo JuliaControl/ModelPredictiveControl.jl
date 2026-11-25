@@ -869,10 +869,9 @@ function init_quadprog(
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
 function init_quadprog(
-    ::SimModel{NT}, ::TranscriptionMethod, ::ControllerWeights, args...; kwargs...
-) where {NT<:Real}
-    H̃ = Hermitian(zeros(NT, 0, 0), :L)
-    return H̃
+    ::SimModel, ::TranscriptionMethod, weights::ControllerWeights, args...; kwargs...
+) 
+    return empty_similar(weights.M_Hp)
 end
 
 "Check the condition number of `H̃` and display a `@warn` if `cond(H̃) > warn_cond`."

@@ -572,7 +572,7 @@ function init_defectmat(
     model::SimModel, estim::InternalModel{NT}, transcription::OrthogonalCollocation, 
     Hp, Hc, _ , Co, λo
 ) where {NT<:Real}
-    As, nxs = zeros(NT, 0, 0), 0 # the state vector is not augmented, no stochastic defects
+    As, nxs = empty_similar(estim.As), 0 # state vector not augmented, no stochastic defects
     return init_defectmat_orthocolloc(model, estim, transcription, Hp, Hc, Co, λo, As, nxs)
 end
 
