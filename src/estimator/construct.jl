@@ -90,14 +90,14 @@ struct KalmanCovariances{
         Q̂::Q̂C, R̂::R̂C, P̂_0=nothing, He=nothing
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
         if isnothing(P̂_0)
-            P̂_0  = Hermitian(zeros(NT, 0, 0), :L) # don't apply to SteadyKalmanFilter
-            invP̄ = Hermitian(zeros(NT, 0, 0), :L) # don't apply to SteadyKalmanFilter
             P̂    = Hermitian(zeros(NT, size(Q̂)), :L) # will hold steady-state error covariance
+            P̂_0  = empty_similar(P̂) # don't apply to SteadyKalmanFilter
+            invP̄ = empty_similar(P̂) # don't apply to SteadyKalmanFilter
         else
             P̂_0 = Hermitian(P̂_0, :L)
             P̂   = copy(P̂_0)
             if isnothing(He) # invP̄ is only necessary for MovingHorizonEstimator:
-                invP̄ = Hermitian(zeros(NT, 0, 0), :L)
+                invP̄ = empty_similar(P̂_0)
             else 
                 invP̄ = copy(P̂_0)
                 try
@@ -114,8 +114,8 @@ struct KalmanCovariances{
         Q̂   = Hermitian(Q̂, :L)
         R̂   = Hermitian(R̂, :L)
         if isnothing(He) # the following variables are only for MovingHorizonEstimator:
-            invQ̂_He = Hermitian(zeros(NT, 0, 0), :L)
-            invR̂_He = Hermitian(zeros(NT, 0, 0), :L)
+            invQ̂_He = empty_similar(Q̂)
+            invR̂_He = empty_similar(R̂)
         else
             invQ̂, invR̂ = copy(Q̂), copy(R̂)
             try
