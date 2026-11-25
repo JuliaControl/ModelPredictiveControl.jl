@@ -269,11 +269,16 @@ to_mat(A::AbstractVector, _ ...) = reshape(A, length(A), 1)
 to_mat(A::AbstractMatrix, _ ...) = A
 to_mat(A::Real, dims...) = fill(A, dims)
 
-"Convert 1-element vectors and normal matrices to Hermitians."
+"Convert 1-element vectors and normal matrices to `Hermitian`s."
 to_hermitian(A::AbstractVector) = Hermitian(reshape(A, 1, 1), :L)
 to_hermitian(A::AbstractMatrix) = Hermitian(A, :L)
 to_hermitian(A::Hermitian) = A
 to_hermitian(A) = A
+
+"Return a 0×0 matrix with the same type as `A`, and assert an identical returned type."
+empty_similar(A::AbstractMatrix) = similar(A, (0, 0))::typeof(A)
+empty_similar(A::Diagonal)       = Diagonal(similar(A.diag, (0,)))::typeof(A)
+empty_similar(A::Hermitian)      = to_hermitian(empty_similar(parent(A)))::typeof(A)
 
 """
 Compute the inverse of a the Hermitian positive definite matrix `A` in-place and return it.

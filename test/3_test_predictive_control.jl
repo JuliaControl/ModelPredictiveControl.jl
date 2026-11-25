@@ -3,6 +3,7 @@
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = LinMPC(model, Hp=15)
     @test isa(mpc1.estim, SteadyKalmanFilter)
+    @test_logs (:warn, r"condition number cond_H̃ > 1") LinMPC(model; warn_cond=1)
     @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
     mpc2 = LinMPC(model, Hc=4, Cwt=Inf)
     @test size(mpc2.Ẽ,2) == 4*mpc2.estim.model.nu
@@ -598,6 +599,7 @@ end
     model = LinModel(sys, Ts, i_d=[3])
     mpc1 = ExplicitMPC(model, Hp=15)
     @test isa(mpc1.estim, SteadyKalmanFilter)
+    @test_logs (:warn, r"condition number cond_H̃ > 1") ExplicitMPC(model; warn_cond=1)
     @test size(mpc1.Ẽ,1) == 15*mpc1.estim.model.ny
     mpc4 = ExplicitMPC(model, Mwt=[1,2], Hp=15)
     @test mpc4.weights.M_Hp ≈ Diagonal(diagm(repeat(Float64[1, 2], 15)))
@@ -736,7 +738,7 @@ end
         T = typeof(Nwt)
         model = LinModel{T}(A, Bu, C, 0, 0, 0.1)
         estim = KalmanFilter(model, nint_ym=0, verify_obsv=false)
-        mpc = ExplicitMPC(estim; Hp=20, Hc=2, Nwt=[Nwt])
+        mpc = ExplicitMPC(estim; Hp=20, Hc=2, Nwt=[Nwt], warn_cond=Inf)
         preparestate!(mpc, [0.0])
         return moveinput!(mpc, [1.0])[1]
     end

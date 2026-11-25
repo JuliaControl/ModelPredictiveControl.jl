@@ -87,58 +87,42 @@ struct KalmanCovariances{
     invQ̂_He::Hermitian{NT, Q̂C}
     invR̂_He::Hermitian{NT, R̂C}
     function KalmanCovariances{NT}(
-        Q̂::Q̂C, R̂::R̂C, P̂_0, He
+        Q̂::Q̂C, R̂::R̂C, P̂_0=nothing, He=nothing
     ) where {NT<:Real, Q̂C<:AbstractMatrix{NT}, R̂C<:AbstractMatrix{NT}}
         if isnothing(P̂_0)
-            P̂_0  = Hermitian(zeros(NT, 0, 0), :L) # don't apply to SteadyKalmanFilter
-            P̂    = Hermitian(zeros(NT, size(Q̂)), :L) # will hold the steady-state error covariance
-            invP̄ = copy(P̂_0)
+            P̂    = Hermitian(zeros(NT, size(Q̂)), :L) # will hold steady-state error covariance
+            P̂_0  = empty_similar(P̂) # don't apply to SteadyKalmanFilter
+            invP̄ = empty_similar(P̂) # don't apply to SteadyKalmanFilter
         else
-            P̂_0     = Hermitian(P̂_0, :L)
-            P̂, invP̄ = copy(P̂_0), copy(P̂_0)
-        try
-            inv!(invP̄)
-        catch err
-            if err isa PosDefException
-                error("P̂_0 is not positive definite")
-            else
-                rethrow()
+            P̂_0 = Hermitian(P̂_0, :L)
+            P̂   = copy(P̂_0)
+            if isnothing(He) # invP̄ is only necessary for MovingHorizonEstimator:
+                invP̄ = empty_similar(P̂_0)
+            else 
+                invP̄ = copy(P̂_0)
+                inv!(invP̄)
             end
         end
-        end
-        P̂_0 = Hermitian(P̂_0, :L)
-        P̂   = Hermitian(P̂, :L)
-        Q̂   = Hermitian(Q̂, :L)
-        R̂   = Hermitian(R̂, :L)
-        # the following variables are only for the moving horizon estimator:
-        invQ̂, invR̂ = copy(Q̂), copy(R̂)
-        try
+        Q̂ = Hermitian(Q̂, :L)
+        R̂ = Hermitian(R̂, :L)
+        if isnothing(He) # the following variables are only for MovingHorizonEstimator:
+            invQ̂_He = empty_similar(Q̂)
+            invR̂_He = empty_similar(R̂)
+        else
+            invQ̂ = copy(Q̂) 
             inv!(invQ̂)
-        catch err
-            if err isa PosDefException
-                error("Q̂ is not positive definite")
-            else
-                rethrow()
-            end
-        end
-        invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
-        try
+            invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
+            invR̂ = copy(R̂)
             inv!(invR̂)
-        catch err
-            if err isa PosDefException
-                error("R̂ is not positive definite")
-            else
-                rethrow()
-            end
+            invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         end
-        invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         return new{NT, Q̂C, R̂C}(P̂_0, P̂, Q̂, R̂, invP̄, invQ̂_He, invR̂_He)
     end
 end
 
 "Outer constructor to validate and convert covariance matrices if necessary."
 function KalmanCovariances(
-        model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=1
+        model::SimModel{NT}, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0=nothing, He=nothing
     ) where {NT<:Real}
     validate_kfcov(model, i_ym, nint_u, nint_ym, Q̂, R̂, P̂_0)
     Q̂ = eltype(Q̂) == NT ? Q̂ : NT.(Q̂)
@@ -200,7 +184,8 @@ function init_estimstoch(
     nu, ny, nym = model.nu, model.ny, length(i_ym)
     As_u , Cs_u , nint_u  = init_integrators(nint_u , nu , "u")
     As_ym, Cs_ym, nint_ym = init_integrators(nint_ym, nym, "ym")
-    As_y, _ , Cs_y = stoch_ym2y(model, i_ym, As_ym, zeros(NT, 0, 0), Cs_ym, zeros(NT, 0, 0))
+    Bs_ym = Ds_ym = empty_similar(As_ym)
+    As_y, _ , Cs_y = stoch_ym2y(model, i_ym, As_ym, Bs_ym, Cs_ym, Ds_ym)
     nxs_u, nxs_y = size(As_u, 1), size(As_y, 1)
     # combines input and output stochastic models:
     As   = [As_u zeros(NT, nxs_u, nxs_y); zeros(NT, nxs_y, nxs_u) As_y]

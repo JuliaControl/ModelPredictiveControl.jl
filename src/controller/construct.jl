@@ -573,11 +573,28 @@ reset_nonlincon!(::PredictiveController) = nothing
 Estimate the default prediction horizon `Hp` for [`LinModel`](@ref).
 """
 default_Hp(model::LinModel) = DEFAULT_HP0 + estimate_delays(model)
-"Throw an error when model is not a [`LinModel`](@ref)."
+"Throw an error when `model` is not a [`LinModel`](@ref)."
 function default_Hp(::SimModelODE)
     msg = "Prediction horizon Hp must be explicitly specified if model is not a LinModel."
     throw(ArgumentError(msg))
 end
+
+"Warn if `Hp ≤ nk`, where `nk` is the estimated delays `model`."
+function verify_delays(model::LinModel, Hp)
+    nk = try
+        estimate_delays(model)
+    catch
+        NaN
+    end
+    if Hp ≤ nk
+        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
+              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
+    end
+    isnan(nk) && @warn("could not estimate the model delay, Hp ($Hp) might be too small.")
+    return nothing
+end
+"Do nothing when `model` is not a [`LinModel`](@ref)."
+verify_delays(::SimModel, _ ) = nothing
 
 """
     estimate_delays(model::LinModel)
@@ -846,37 +863,31 @@ function init_quadprog(
 )
     M_Hp, Ñ_Hc, L_Hp = weights.M_Hp, weights.Ñ_Hc, weights.L_Hp
     H̃ = Hermitian(2*(Ẽ'*M_Hp*Ẽ + P̃Δu'*Ñ_Hc*P̃Δu + P̃u'*L_Hp*P̃u), :L)
+    warn_cond = isinf(warn_cond) ? nothing : warn_cond
     verify_cond(transcription, H̃, warn_cond)
     return H̃
 end
 "Return empty matrix if `model` is not a [`LinModel`](@ref)."
 function init_quadprog(
-    ::SimModel{NT}, ::TranscriptionMethod, ::ControllerWeights, args...; kwargs...
-) where {NT<:Real}
-    H̃ = Hermitian(zeros(NT, 0, 0), :L)
-    return H̃
+    ::SimModel, ::TranscriptionMethod, weights::ControllerWeights, args...; kwargs...
+) 
+    return empty_similar(weights.M_Hp)
 end
 
 "Check the condition number of `H̃` and display a `@warn` if `cond(H̃) > warn_cond`."
-function verify_cond(::SingleShooting, H̃, warn_cond)
-    if !isinf(warn_cond)
-        cond_H̃ = try
-            cond(H̃)
-        catch
-            NaN
-        end 
-        cond_H̃ > warn_cond && @warn(
-            "The Hessian condition number cond_H̃ > $warn_cond. The optimization " *
-            "problem may be ill-conditioned.\n Consider changing the tunings, using " *
-            "MultipleShooting, or using an optimizer more robust to this like DAQP.",
-            cond_H̃,
-        )
-        isnan(cond_H̃) && @warn("could not validate the condition number of the QP Hessian.")
-    end
+function verify_cond(::SingleShooting, H̃, warn_cond::Real)
+    cond_H̃ = cond(H̃)
+    cond_H̃ > warn_cond && @warn(
+        "The Hessian condition number cond_H̃ > $warn_cond. The optimization " *
+        "problem may be ill-conditioned.\n Consider changing the tunings, using " *
+        "MultipleShooting, or using an optimizer more robust to this like DAQP.",
+        cond_H̃,
+    )
     return nothing
 end
-"No check if `transcription` is not a `SingleShooting`."
-verify_cond(::TranscriptionMethod, _, _) = nothing
+"No check if `transcription` is not a `SingleShooting` or `isnothing(warn_cond)`."
+verify_cond(::TranscriptionMethod, _ , ::Any) = nothing
+verify_cond(::SingleShooting, _ ,  ::Nothing) = nothing
 
 """
     init_defaultcon_mpc(

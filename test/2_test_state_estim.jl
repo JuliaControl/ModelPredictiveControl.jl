@@ -1020,15 +1020,34 @@ end
     He = 3
     nx̂ = linmodel.nx
     nc = nx̂*(He+1)
-    mhe = MovingHorizonEstimator(linmodel, nint_ym=0, Cwt=1e5, He=He, gc=gcl, nc=nc, p=nc)
-    @test mhe.con.nc == nc
-    @test mhe.nε > 0
-    @test mhe.He == 3
+    mhe16 = MovingHorizonEstimator(linmodel, nint_ym=0, Cwt=1e5, He=He, gc=gcl, nc=nc, p=nc)
+    @test mhe16.con.nc == nc
+    @test mhe16.nε > 0
+    @test mhe16.He == 3
 
+    He, i_ym, nint_u, nint_ym = 1, 1:2, 0, 0
+    P̂_0 = fill(0.5, 4, 4)
+    P̂_0[diagind(P̂_0)] .= 1.0
+    Q̂, R̂ = 0.5*P̂_0, [0.1 0.01; 0.01 0.1]
+    mhe17 = MovingHorizonEstimator(linmodel, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
+    @test mhe17.cov.invP̄    ≈ inv(P̂_0)
+    @test mhe17.cov.invQ̂_He ≈ inv(Q̂)
+    @test mhe17.cov.invR̂_He ≈ inv(R̂)
+    
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, Cwt=-1)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=1, σP_0=nothing)
+    @test_throws PosDefException MovingHorizonEstimator(
+        linmodel, He, i_ym, nint_u, nint_ym, zeros(4, 4), Q̂, R̂
+    )
+    @test_throws PosDefException MovingHorizonEstimator(
+        linmodel, He, i_ym, nint_u, nint_ym, P̂_0, zeros(4, 4), R̂
+    )
+    @test_throws PosDefException MovingHorizonEstimator(
+        linmodel, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, zeros(2, 2)
+    )
+
 end
 
 @testitem "MHE construction (NonLinModel)" setup=[SetupMPCtests] begin

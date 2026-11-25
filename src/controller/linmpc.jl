@@ -48,7 +48,8 @@ struct LinMPC{
     function LinMPC{NT}(
         estim::SE, Hp, Hc, nb, weights::CW,
         Wy, Wu, Wd, Wr,
-        transcription::TM, optim::JM
+        transcription::TM, optim::JM;
+        warn_cond=1e6
     ) where {
             NT<:Real, 
             SE<:StateEstimator, 
@@ -79,7 +80,7 @@ struct LinMPC{
             ES, GS, JS, KS, VS, BS,
             Wy, Wu, Wd, Wr
         )
-        H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u)
+        H̃ = init_quadprog(model, transcription, weights, Ẽ, P̃Δu, P̃u; warn_cond)
         # dummy vals (updated just before optimization):
         q̃, r = zeros(NT, size(H̃, 1)), zeros(NT, 1)
         Ks, Ps = init_stochpred(estim, Hp)
@@ -168,6 +169,8 @@ arguments. This controller allocates memory at each time step for the optimizati
 - `optim=JuMP.Model(OSQP.MathOptInterfaceOSQP.Optimizer)` : quadratic optimizer used in
   the predictive controller, provided as a [`JuMP.Model`](@extref) object (default to 
   [`OSQP`](https://osqp.org/docs/parsers/jump.html) optimizer).
+- `warn_cond=1e6` : warn if the condition number of the Hessian for the QP exceeds this
+  value, use `warn_cond=Inf` to skip the check.
 - additional keyword arguments are passed to [`SteadyKalmanFilter`](@ref) constructor.
 
 # Examples
@@ -242,12 +245,14 @@ function LinMPC(
     Cwt = DEFAULT_CWT,
     transcription::ShootingMethod = SingleShooting(),
     optim::JuMP.GenericModel = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true),
+    warn_cond=1e6,
     kwargs...
 )
     estim = SteadyKalmanFilter(model; kwargs...)
     return LinMPC(
-        estim; 
-        Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, Wy, Wu, Wd, Wr, transcription, optim
+        estim;
+        Hp, Hc, Mwt, Nwt, Lwt, Cwt, M_Hp, N_Hc, L_Hp, Wy, Wu, Wd, Wr, 
+        transcription, optim, warn_cond
     )
 end
 
@@ -300,18 +305,17 @@ function LinMPC(
     Wr = nothing,
     Cwt  = DEFAULT_CWT,
     transcription::ShootingMethod = SingleShooting(),
-    optim::JM = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true)
+    optim::JM = JuMP.Model(DEFAULT_QP_OPTIMIZER, add_bridges=true),
+    warn_cond=1e6
 ) where {NT<:Real, SE<:StateEstimator{NT}, JM<:JuMP.GenericModel}
     isa(estim.model, LinModel) || error(MSG_LINMODEL_ERR) 
-    nk = estimate_delays(estim.model)
-    if Hp ≤ nk
-        @warn("prediction horizon Hp ($Hp) ≤ estimated number of delays in model "*
-              "($nk), the closed-loop system may be unstable or zero-gain (unresponsive)")
-    end
+    verify_delays(estim.model, Hp)
     nb = move_blocking(Hp, Hc)
     Hc = get_Hc(nb)
     weights = ControllerWeights(estim.model, Hp, Hc, M_Hp, N_Hc, L_Hp, Cwt)
-    return LinMPC{NT}(estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, transcription, optim)
+    return LinMPC{NT}(
+        estim, Hp, Hc, nb, weights, Wy, Wu, Wd, Wr, transcription, optim; warn_cond
+    )
 end
 
 """
