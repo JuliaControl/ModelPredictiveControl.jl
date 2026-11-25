@@ -100,43 +100,20 @@ struct KalmanCovariances{
                 invP̄ = empty_similar(P̂_0)
             else 
                 invP̄ = copy(P̂_0)
-                try
-                    inv!(invP̄)
-                catch err
-                    if err isa PosDefException
-                        error("P̂_0 is not positive definite")
-                    else
-                        rethrow()
-                    end
-                end
+                inv!(invP̄)
             end
         end
-        Q̂   = Hermitian(Q̂, :L)
-        R̂   = Hermitian(R̂, :L)
+        Q̂ = Hermitian(Q̂, :L)
+        R̂ = Hermitian(R̂, :L)
         if isnothing(He) # the following variables are only for MovingHorizonEstimator:
             invQ̂_He = empty_similar(Q̂)
             invR̂_He = empty_similar(R̂)
         else
-            invQ̂, invR̂ = copy(Q̂), copy(R̂)
-            try
-                inv!(invQ̂)
-            catch err
-                if err isa PosDefException
-                    error("Q̂ is not positive definite")
-                else
-                    rethrow()
-                end
-            end
+            invQ̂ = copy(Q̂) 
+            inv!(invQ̂)
             invQ̂_He = Hermitian(repeatdiag(invQ̂, He), :L)
-            try
-                inv!(invR̂)
-            catch err
-                if err isa PosDefException
-                    error("R̂ is not positive definite")
-                else
-                    rethrow()
-                end
-            end
+            invR̂ = copy(R̂)
+            inv!(invR̂)
             invR̂_He = Hermitian(repeatdiag(invR̂, He), :L)
         end
         return new{NT, Q̂C, R̂C}(P̂_0, P̂, Q̂, R̂, invP̄, invQ̂_He, invR̂_He)
