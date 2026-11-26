@@ -729,7 +729,7 @@ end
 
 @testitem "ExplicitMPC autodiff" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
-    using ForwardDiff
+    using Logging, ForwardDiff
 
     A  = [0.9 0.08; -0.15 0.75]
     Bu = [0.005, 0.09]
@@ -743,7 +743,10 @@ end
         return moveinput!(mpc, [1.0])[1]
     end
     @test_nowarn first_move(0.5)
-    @test_nowarn ForwardDiff.derivative(first_move, 0.5)
+    errorlogger = ConsoleLogger(stderr, Logging.Error)
+    @test_nowarn with_logger(errorlogger) do 
+        ForwardDiff.derivative(first_move, 0.5)
+    end
 
 end
 
