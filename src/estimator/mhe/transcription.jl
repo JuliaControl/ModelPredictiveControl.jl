@@ -851,6 +851,7 @@ function deleteÂ_lincon!(
     foreach(i -> !isinf(Âmax[i]) && (i_Âmax[i] = false), eachindex(i_Âmax))
     return i_Âmin, i_Âmax
 end
+deleteÂ_lincon!(i_Âmin, i_Âmax, ::SimModel, ::TranscriptionMethod, _, _, _, _) = i_Âmin, i_Âmax
     
 "Unset `i_Ŵmin` and `i_Ŵmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)
