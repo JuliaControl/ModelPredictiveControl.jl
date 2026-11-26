@@ -99,7 +99,8 @@ following fields:
 - `:ε` or *`:epsilon`* : optimal slack variable, ``ε``
 - `:X̂` or *`:Xhat`* : optimal estimated states over ``N_k``, ``\mathbf{X̂}``
 - `:x̂` or *`:xhat`* : optimal estimated state, ``\mathbf{x̂}_k(k+p)``
-- `:Â` or *`:Ahat`* : optimal estimated algebraic variables over ``N_k``, ``\mathbf{Â}``
+- `:Â` or *`:Ahat`* : optimal estimated algebraic variables over ``N_k`` (left limits), ``\mathbf{Â}``
+- `:â` or *`:ahat`* : optimal estimated algebraic variable (left limit), ``\mathbf{â}(k+p)``
 - `:V̂` or *`:Vhat`* : optimal estimated sensor noise over ``N_k``, ``\mathbf{V̂}``
 - `:P̄` or *`:Pbar`* : estimation error covariance at arrival, ``\mathbf{P̄}``
 - `:x̄` or *`:xbar`* : optimal estimation error at arrival, ``\mathbf{x̄}``
@@ -113,8 +114,8 @@ following fields:
 - `:D`   : measured disturbances over ``N_k+1``, ``\mathbf{D}``
 - `:sol` : solution summary of the optimizer for printing
 
-For [`NonLinModel`](@ref) or under custom nonlinear inequality constraints (`nc>0`), it also
-includes the following fields:
+For non-[`LinModel`](@ref) or under custom nonlinear inequality constraints (`nc>0`), it
+also includes the following fields:
 
 - `:∇J` or *`:nablaJ`* : optimal gradient of the objective function, ``\mathbf{\nabla} J``
 - `:∇²J` or *`:nabla2J`* : optimal Hessian of the objective function, ``\mathbf{\nabla^2}J``
@@ -176,18 +177,20 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     end
     D[end-nd+1:end] .+= model.dop
     x̂arr            .+= estim.x̂op
+    Â, âarr = Â0, â0arr # no operating points on the algebraic variable
     info[:Ŵ]  = Ŵ[1:nŵ*Nk]
     info[:ε]  = getslack(estim, Z̃)
     info[:X̂]  = X̂[1:nx̂*Nk]
-    info[:Â]  = Â0[1:na*Nk]
-    info[:x̂]  = estim.x̂0 .+ estim.x̂op
+    info[:x̂]  = X̂[(1+nx̂*Nk-nx̂):(nx̂*Nk)]
+    info[:Â]  = Â[1:na*Nk]
+    info[:â]  = Â[(1+na*Nk-na):(na*Nk)]
     info[:V̂]  = V̂[1:nym*Nk]
     info[:P̄]  = estim.P̂arr_old
     info[:x̄]  = x̄
     info[:Ŷ]  = Ŷ[1:ny*Nk]
     info[:Ŷm] = Ŷ[vec(estim.i_ym .+ ny.*(0:Nk-1)')]
     info[:x̂arr] = x̂arr
-    info[:âarr] = â0arr
+    info[:âarr] = âarr
     info[:J]  = J
     info[:Ym] = Ym
     info[:U]  = U 
@@ -199,7 +202,9 @@ function getinfo(estim::MovingHorizonEstimator{NT}) where NT<:Real
     info[:ahatarr] = info[:âarr]
     info[:epsilon] = info[:ε]
     info[:Xhat] = info[:X̂]
+    info[:xhat] = info[:x̂]
     info[:Ahat] = info[:Â]
+    info[:ahat] = info[:â]
     info[:Vhat] = info[:V̂]
     info[:Pbar] = info[:P̄]
     info[:xbar] = info[:x̄]

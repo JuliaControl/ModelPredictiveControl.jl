@@ -1558,7 +1558,10 @@ end
     preparestate!(mhe, [0], [0])
     info = getinfo(mhe)
     @test info[:x̂] ≈ x̂ atol=1e-5
+    @test info[:xhat] ≈ x̂ atol=1e-5
     @test info[:Ŷ][end] ≈ 0 atol=1e-5
+    @test info[:â] ≈ [0.0] atol=1e-5
+    @test info[:ahat] ≈ [0.0] atol=1e-5
     for i in 1:40
         preparestate!(mhe, [0], [0])
         updatestate!(mhe, [3.0], [0], [0])
