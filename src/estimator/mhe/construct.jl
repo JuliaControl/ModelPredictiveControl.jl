@@ -813,6 +813,7 @@ noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
     \mathbf{x̂_{min} - c_{x̂_{min}}} ε ≤&&\   \mathbf{x̂}_k(k-j+p) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 0    \\
+    \mathbf{â_{min} - c_{â_{min}}} ε ≤&&\     \mathbf{â}(k-j+p) &≤ \mathbf{â_{max} + c_{â_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 0    \\
     \mathbf{ŵ_{min} - c_{ŵ_{min}}} ε ≤&&\     \mathbf{ŵ}(k-j+p) &≤ \mathbf{ŵ_{max} + c_{ŵ_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 1    \\
     \mathbf{v̂_{min} - c_{v̂_{min}}} ε ≤&&\     \mathbf{v̂}(k-j+1) &≤ \mathbf{v̂_{max} + c_{v̂_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 1
 \end{alignat*}
