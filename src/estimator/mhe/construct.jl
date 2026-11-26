@@ -1114,7 +1114,7 @@ function setconstraint!(
     else
         i_b, i_g = init_matconstraint_mhe(
             model, transcription, Z̃min, Z̃max, con.nc, nε,
-            con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
+            con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, con.Âmin, con.Âmax,
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max
         )
         diff_Z̃min, diff_Z̃max = diff_infs(Z̃min, con.Z̃min), diff_infs(Z̃max, con.Z̃max)
