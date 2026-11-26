@@ -20,7 +20,7 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     GX̂      ::Matrix{NT}
     JX̂      ::Matrix{NT}
     BX̂      ::Vector{NT}
-    # matrices for the zero defect constraints (N/A for single shooting transcriptions):
+    # matrices for the zero defect constraints (N/A for single shooting):
     ẼS      ::Matrix{NT}
     FS      ::Vector{NT}
     GS      ::Matrix{NT}
@@ -31,6 +31,8 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     x̂0max   ::Vector{NT}
     X̂0min   ::Vector{NT}
     X̂0max   ::Vector{NT}
+    Âmin    ::Vector{NT}
+    Âmax    ::Vector{NT}
     Ŵmin    ::Vector{NT}
     Ŵmax    ::Vector{NT}
     V̂min    ::Vector{NT}
@@ -43,6 +45,8 @@ struct EstimatorConstraint{NT<:Real, GCfunc<:Union{Nothing, Function}}
     A_x̂max  ::Matrix{NT}
     A_X̂min  ::Matrix{NT}
     A_X̂max  ::Matrix{NT}
+    A_Âmin  ::SparseMatrixCSC{NT,Int}
+    A_Âmax  ::SparseMatrixCSC{NT,Int}
     A_Ŵmin  ::SparseMatrixCSC{NT,Int}
     A_Ŵmax  ::SparseMatrixCSC{NT,Int}
     A_V̂min  ::Matrix{NT}
@@ -808,8 +812,9 @@ end
 
 Set the bound constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
-It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, process 
-noise ``\mathbf{ŵ}`` and sensor noise ``\mathbf{v̂}``:
+It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, algebraic
+variable ``\mathbf{â}`` (for [`NonLinModelDAE](@ref)), process noise ``\mathbf{ŵ}`` and
+sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
     \mathbf{x̂_{min} - c_{x̂_{min}}} ε ≤&&\   \mathbf{x̂}_k(k-j+p) &≤ \mathbf{x̂_{max} + c_{x̂_{max}}} ε &&\qquad  j = N_k, N_k - 1, ... , 0    \\
@@ -835,9 +840,11 @@ the constant ``p``, on model augmentation and on time-varying constraints.
 
 - `estim::MovingHorizonEstimator` : moving horizon estimator to set constraints
 - `x̂min=fill(-Inf,nx̂)` / `x̂max=fill(+Inf,nx̂)` : estimated state bound ``\mathbf{x̂_{min/max}}``
+- `âmin=fill(-Inf,na)` / `âmax=fill(+Inf,na)` : estimated algebraic variable bound ``\mathbf{â_{min/max}}``
 - `ŵmin=fill(-Inf,nx̂)` / `ŵmax=fill(+Inf,nx̂)` : estimated process noise bound ``\mathbf{ŵ_{min/max}}``
 - `v̂min=fill(-Inf,nym)` / `v̂max=fill(+Inf,nym)` : estimated sensor noise bound ``\mathbf{v̂_{min/max}}``
 - `c_x̂min=fill(0.0,nx̂)` / `c_x̂max=fill(0.0,nx̂)` : `x̂min` / `x̂max` softness weight ``\mathbf{c_{x̂_{min/max}}}``
+- `c_âmin=fill(0.0,na)` / `c_âmax=fill(0.0,na)` : `âmin` / `âmax` softness weight ``\mathbf{c_{â_{min/max}}}``
 - `c_ŵmin=fill(0.0,nx̂)` / `c_ŵmax=fill(0.0,nx̂)` : `ŵmin` / `ŵmax` softness weight ``\mathbf{c_{ŵ_{min/max}}}``
 - `c_v̂min=fill(0.0,nym)` / `c_v̂max=fill(0.0,nym)` : `v̂min` / `v̂max` softness weight ``\mathbf{c_{v̂_{min/max}}}``
 -  all the keyword arguments above but with a first capital letter, e.g. `X̂max` or `C_ŵmax`:
@@ -880,47 +887,59 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
     estimation horizon ``H_e`` are also possible, mathematically defined as:
     ```math 
     \begin{alignat*}{3}
-        \mathbf{X̂_{min} - C_{x̂_{min}}} ε ≤&&\ \mathbf{X̂} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ε \\
-        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ε ≤&&\ \mathbf{Ŵ} &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ε \\
-        \mathbf{V̂_{min} - C_{v̂_{min}}} ε ≤&&\ \mathbf{V̂} &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ε
+        \mathbf{X̂_{min} - C_{x̂_{min}}} ε ≤&&\ \mathbf{X̂_e} &≤ \mathbf{X̂_{max} + C_{x̂_{max}}} ε \\
+        \mathbf{Â_{min} - C_{â_{min}}} ε ≤&&\ \mathbf{Â_e} &≤ \mathbf{Â_{max} + C_{â_{max}}} ε \\
+        \mathbf{Ŵ_{min} - C_{ŵ_{min}}} ε ≤&&\ \mathbf{Ŵ}   &≤ \mathbf{Ŵ_{max} + C_{ŵ_{max}}} ε \\
+        \mathbf{V̂_{min} - C_{v̂_{min}}} ε ≤&&\ \mathbf{V̂}   &≤ \mathbf{V̂_{max} + C_{v̂_{max}}} ε
     \end{alignat*}
     ```
     For this, use the same keyword arguments as above but with a first capital letter:
-    - `X̂min` / `X̂max` / `C_x̂min` / `C_x̂max` : ``\mathbf{X̂}`` constraints `(nx̂*(He+1),)`.
+    - `X̂min` / `X̂max` / `C_x̂min` / `C_x̂max` : ``\mathbf{X̂_e}`` constraints `(nx̂*(He+1),)`.
+    - `Âmin` / `Âmax` / `C_âmin` / `C_âmax` : ``\mathbf{Â_e}`` constraints `(na*(He+1),)`.
     - `Ŵmin` / `Ŵmax` / `C_ŵmin` / `C_ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
     - `V̂min` / `V̂max` / `C_v̂min` / `C_v̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
+    The subscript ``\mathbf{e}`` stands for extended with the arrival estimate.
 """
 function setconstraint!(
     estim::MovingHorizonEstimator; 
     xhatmin   = nothing, xhatmax   = nothing,
+    ahatmin   = nothing, ahatmax   = nothing,
     whatmin   = nothing, whatmax   = nothing,
     vhatmin   = nothing, vhatmax   = nothing,
     c_xhatmin = nothing, c_xhatmax = nothing,
+    c_ahatmin = nothing, c_ahatmax = nothing,
     c_whatmin = nothing, c_whatmax = nothing,
     c_vhatmin = nothing, c_vhatmax = nothing,
     Xhatmin   = nothing, Xhatmax   = nothing,
+    Ahatmin   = nothing, Ahatmax   = nothing,
     Whatmin   = nothing, Whatmax   = nothing,
     Vhatmin   = nothing, Vhatmax   = nothing,
     C_xhatmin = nothing, C_xhatmax = nothing,
+    C_ahatmin = nothing, C_ahatmax = nothing,
     C_whatmin = nothing, C_whatmax = nothing,
     C_vhatmin = nothing, C_vhatmax = nothing,
-    x̂min   = xhatmin,   x̂max   = xhatmax,
-    ŵmin   = whatmin,   ŵmax   = whatmax,
-    v̂min   = vhatmin,   v̂max   = vhatmax,
-    c_x̂min = c_xhatmin, c_x̂max = c_xhatmax,
-    c_ŵmin = c_whatmin, c_ŵmax = c_whatmax,
-    c_v̂min = c_vhatmin, c_v̂max = c_vhatmax,
-    X̂min   = Xhatmin,   X̂max   = Xhatmax,
-    Ŵmin   = Whatmin,   Ŵmax   = Whatmax,
-    V̂min   = Vhatmin,   V̂max   = Vhatmax,
-    C_x̂min = C_xhatmin, C_x̂max = C_xhatmax,
-    C_ŵmin = C_whatmin, C_ŵmax = C_whatmax,
-    C_v̂min = C_vhatmin, C_v̂max = C_vhatmax,
+    x̂min   = xhatmin,    x̂max   = xhatmax,
+    âmin   = ahatmin,    âmax   = ahatmax,
+    ŵmin   = whatmin,    ŵmax   = whatmax,
+    v̂min   = vhatmin,    v̂max   = vhatmax,
+    c_x̂min = c_xhatmin,  c_x̂max = c_xhatmax,
+    c_âmin = c_ahatmin,  c_âmax = c_ahatmax,
+    c_ŵmin = c_whatmin,  c_ŵmax = c_whatmax,
+    c_v̂min = c_vhatmin,  c_v̂max = c_vhatmax,
+    X̂min   = Xhatmin,    X̂max   = Xhatmax,
+    Âmin   = Ahatmin,    Âmax   = Ahatmax,
+    Ŵmin   = Whatmin,    Ŵmax   = Whatmax,
+    V̂min   = Vhatmin,    V̂max   = Vhatmax,
+    C_x̂min = C_xhatmin,  C_x̂max = C_xhatmax,
+    C_âmin = C_ahatmin,  C_âmax = C_ahatmax,
+    C_ŵmin = C_whatmin,  C_ŵmax = C_whatmax,
+    C_v̂min = C_vhatmin,  C_v̂max = C_vhatmax,
 )
     model, optim, con = estim.model, estim.optim, estim.con
     transcription = estim.transcription
     nε, nx̂, nŵ, nym, He = estim.nε, estim.nx̂, estim.nx̂, estim.nym, estim.He
-    nX̂con = nx̂*(He+1)
+    na = get_na(model)
+    nX̂e, nÂe = nx̂*(He+1), na*(He+1)
     notSolvedYet = (JuMP.termination_status(optim) == JuMP.OPTIMIZE_NOT_CALLED)
     C = estim.C
     if isnothing(X̂min) && !isnothing(x̂min)
@@ -930,7 +949,7 @@ function setconstraint!(
             con.X̂0min[i] = x̂min[(i-1) % nx̂ + 1] - estim.X̂op[i]
         end
     elseif !isnothing(X̂min)
-        size(X̂min) == (nX̂con,) || throw(DimensionMismatch("X̂min size must be $((nX̂con,))"))
+        size(X̂min) == (nX̂e,) || throw(DimensionMismatch("X̂min size must be $((nX̂e,))"))
         con.x̂0min .= @views X̂min[1:nx̂] .- estim.x̂op
         con.X̂0min .= @views X̂min[nx̂+1:end] .- estim.X̂op
     end
@@ -941,9 +960,27 @@ function setconstraint!(
             con.X̂0max[i] = x̂max[(i-1) % nx̂ + 1] - estim.X̂op[i]
         end
     elseif !isnothing(X̂max)
-        size(X̂max) == (nX̂con,) || throw(DimensionMismatch("X̂max size must be $((nX̂con,))"))
+        size(X̂max) == (nX̂e,) || throw(DimensionMismatch("X̂max size must be $((nX̂e,))"))
         con.x̂0max .= @views X̂max[1:nx̂] .- estim.x̂op
         con.X̂0max .= @views X̂max[nx̂+1:end] .- estim.X̂op
+    end
+    if isnothing(Âmin) && !isnothing(âmin)
+        size(âmin) == (na,) || throw(DimensionMismatch("âmin size must be $((na,))")) 
+        for i in 1:(na*(He+1))
+            con.Âmin[i] = âmin[(i-1) % na + 1]
+        end
+    elseif !isnothing(Âmin)
+        size(X̂min) == (nÂe,) || throw(DimensionMismatch("Âmin size must be $((nÂe,))"))
+        con.Âmin .= Âmin
+    end
+    if isnothing(Âmax) && !isnothing(âmax)
+        size(âmax) == (na,) || throw(DimensionMismatch("âmax size must be $((nxa,))"))
+        for i in 1:(na*(He+1))
+            con.Âmax[i] = âmax[(i-1) % na + 1]
+        end
+    elseif !isnothing(Âmax)
+        size(X̂max) == (nÂe,) || throw(DimensionMismatch("Âmax size must be $((nÂe,))"))
+        con.Âmax .= Âmin
     end
     if isnothing(Ŵmin) && !isnothing(ŵmin)
         size(ŵmin) == (nŵ,) || throw(DimensionMismatch("ŵmin size must be $((nŵ,))"))
@@ -982,8 +1019,8 @@ function setconstraint!(
         con.V̂max .= V̂max
     end
     allECRs = (
-        c_x̂min, c_x̂max, c_ŵmin, c_ŵmax, c_v̂min, c_v̂max,
-        C_x̂min, C_x̂max, C_ŵmin, C_ŵmax, C_v̂min, C_v̂max,
+        c_x̂min, c_x̂max, c_âmin, c_âmax, c_ŵmin, c_ŵmax, c_v̂min, c_v̂max,
+        C_x̂min, C_x̂max, C_âmin, C_âmax, C_ŵmin, C_ŵmax, C_v̂min, C_v̂max,
     )
     if any(ECR -> !isnothing(ECR), allECRs)
         !isinf(C) || throw(ArgumentError("Slack variable weight Cwt must be finite to set softness parameters"))
@@ -992,23 +1029,35 @@ function setconstraint!(
     if notSolvedYet
         isnothing(C_x̂min) && !isnothing(c_x̂min) && (C_x̂min = repeat(c_x̂min, He+1))
         isnothing(C_x̂max) && !isnothing(c_x̂max) && (C_x̂max = repeat(c_x̂max, He+1))
+        isnothing(C_âmin) && !isnothing(c_âmin) && (C_âmin = repeat(c_âmin, He+1))
+        isnothing(C_âmax) && !isnothing(c_âmax) && (C_âmax = repeat(c_âmax, He+1))
         isnothing(C_ŵmin) && !isnothing(c_ŵmin) && (C_ŵmin = repeat(c_ŵmin, He))
         isnothing(C_ŵmax) && !isnothing(c_ŵmax) && (C_ŵmax = repeat(c_ŵmax, He))
         isnothing(C_v̂min) && !isnothing(c_v̂min) && (C_v̂min = repeat(c_v̂min, He))
         isnothing(C_v̂max) && !isnothing(c_v̂max) && (C_v̂max = repeat(c_v̂max, He))
         if !isnothing(C_x̂min)
-            size(C_x̂min) == (nX̂con,) || throw(DimensionMismatch("C_x̂min size must be $((nX̂con,))"))
+            size(C_x̂min) == (nX̂e,) || throw(DimensionMismatch("C_x̂min size must be $((nX̂e,))"))
             any(C_x̂min .< 0) && error("C_x̂min weights should be non-negative")
             con.A_x̂min[:, begin] .= @. @views -C_x̂min[1:nx̂] 
             con.C_x̂min .= @. @views C_x̂min[nx̂+1:end]
             size(con.A_X̂min, 1) ≠ 0 && (con.A_X̂min[:, begin] = -con.C_x̂min) # for LinModel
         end
         if !isnothing(C_x̂max)
-            size(C_x̂max) == (nX̂con,) || throw(DimensionMismatch("C_x̂max size must be $((nX̂con,))"))
+            size(C_x̂max) == (nX̂e,) || throw(DimensionMismatch("C_x̂max size must be $((nX̂e,))"))
             any(C_x̂max .< 0) && error("C_x̂max weights should be non-negative")
             con.A_x̂max[:, begin] .= @. @views -C_x̂max[1:nx̂]
             con.C_x̂max .= @. @views C_x̂max[nx̂+1:end]
             size(con.A_X̂max, 1) ≠ 0 && (con.A_X̂max[:, begin] = -con.C_x̂max) # for LinModel
+        end
+        if !isnothing(C_âmin)
+            size(C_âmin) == (nÂe,) || throw(DimensionMismatch("C_âmin size must be $((nÂe,))"))
+            any(C_âmin .< 0) && error("C_âmin weights should be non-negative")
+            con.A_âmin[:, begin] .= @. -C_âmin 
+        end
+        if !isnothing(C_âmax)
+            size(C_âmax) == (nÂe,) || throw(DimensionMismatch("C_âmax size must be $((nÂe,))"))
+            any(C_âmax .< 0) && error("C_âmax weights should be non-negative")
+            con.A_âmax[:, begin] .= @. -C_âmax
         end
         if !isnothing(C_ŵmin)
             size(C_ŵmin) == (nŵ*He,) || throw(DimensionMismatch("C_ŵmin size must be $((nŵ*He,))"))
@@ -1035,16 +1084,17 @@ function setconstraint!(
     end
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
-        con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Ŵmin,   con.Ŵmax, 
-        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+        con.x̂0min, con.x̂0max, con.X̂0min, con.X̂0max, con.Âmin, con.Âmax, con.Ŵmin, con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max,
+        con.A_Âmin, con.A_Âmax, con.A_Ŵmin, con.A_Ŵmax 
     )
     Z̃var = optim[:Z̃var]
     if notSolvedYet
         con.i_b[:], con.i_g[:], con.A[:] = init_matconstraint_mhe(
             model, transcription, Z̃min, Z̃max, con.nc, nε,
-            con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max, 
+            con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Âmin,  con.Âmax, 
             con.Ŵmin,   con.Ŵmax,   con.V̂min,   con.V̂max,
-            con.A_x̂min, con.A_x̂max, con.A_X̂min, con.A_X̂max, 
+            con.A_x̂min, con.A_x̂max, con.A_X̂min, con.A_X̂max, con.A_Âmin, con.A_Âmax,
             con.A_Ŵmin, con.A_Ŵmax, con.A_V̂min, con.A_V̂max,
             con.Aeq
         )
@@ -1138,32 +1188,38 @@ function init_defaultcon_mhe(
     ES, GS, JS, BS,
     gc!::GCfunc, nc
 ) where {NT<:Real, GCfunc<:Function}
-    nŵ = nx̂
+    nŵ, na = nx̂, get_na(model)
     nX̂, nŴ, nYm = nx̂*He, nŵ*He, nym*He
+    nÂe = na*(He+1)
     nε = isinf(Cwt) ? 0 : 1
     nS = size(ES, 1)
     x̂0min, x̂0max = fill(convert(NT,-Inf), nx̂),  fill(convert(NT,+Inf), nx̂)
     X̂0min, X̂0max = fill(convert(NT,-Inf), nX̂),  fill(convert(NT,+Inf), nX̂)
+    Âmin, Âmax   = fill(convert(NT,-Inf), nÂe), fill(convert(NT,+Inf), nÂe)
     Ŵmin, Ŵmax   = fill(convert(NT,-Inf), nŴ),  fill(convert(NT,+Inf), nŴ)
     V̂min, V̂max   = fill(convert(NT,-Inf), nYm), fill(convert(NT,+Inf), nYm)
     c_x̂min, c_x̂max = fill(0.0, nx̂),  fill(0.0, nx̂)
     C_x̂min, C_x̂max = fill(0.0, nX̂),  fill(0.0, nX̂)
+    C_âmin, C_âmax = fill(0.0, nÂe), fill(0.0, nÂe)
     C_ŵmin, C_ŵmax = fill(0.0, nŴ),  fill(0.0, nŴ)
     C_v̂min, C_v̂max = fill(0.0, nYm), fill(0.0, nYm)
     A_x̂min, A_x̂max, ẽx̄ = relaxarrival(ex̄, c_x̂min, c_x̂max, nε)
     A_X̂min, A_X̂max, ẼX̂ = relaxX̂(EX̂, C_x̂min, C_x̂max, nε)
+    A_Âmin, A_Âmax     = relaxÂ(ex̄, EX̂, C_âmin, C_âmax, nε)
     A_Ŵmin, A_Ŵmax     = relaxŴ(Tŵ, C_ŵmin, C_ŵmax, nε)
     A_V̂min, A_V̂max, Ẽ  = relaxV̂(E, C_v̂min, C_v̂max , nε)
     Aeq, ẼS = augmentdefect(ES, nε; slackfirst=true)
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
-        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
-        A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
+        x̂0min,  x̂0max,  X̂0min,  X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, 
+        A_x̂min, A_x̂max, A_Âmin, A_Âmax, 
+        C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
         model, transcription, Z̃min, Z̃max, nc, nε,
-        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq
+        x̂0min, x̂0max, X̂0min, X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, V̂min, V̂max,
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, 
+        Aeq
     )
     # dummy vectors (updated just before optimization):
     FX̂, FS = zeros(NT, nx̂*He), zeros(NT, nS)
@@ -1171,9 +1227,9 @@ function init_defaultcon_mhe(
     con = EstimatorConstraint{NT, GCfunc}(
         ẼX̂, FX̂, GX̂, JX̂, BX̂,
         ẼS, FS, GS, JS, BS,
-        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max,
+        x̂0min, x̂0max, X̂0min, X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, V̂min, V̂max,
         Z̃min, Z̃max,
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max,
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max,
         A, b, i_b,
         Aeq, beq,
         neq,
@@ -1258,6 +1314,27 @@ function relaxX̂(EX̂::AbstractMatrix{NT}, C_x̂min, C_x̂max, nε) where NT<:R
     return A_X̂min, A_X̂max, ẼX̂
 end
 
+"""
+    relaxÂ(ex̄, EX̂, C_âmin, C_âmax, nε) -> A_Âmin, A_Âmax
+
+Augment algebraic variable constraints with slack variable ε for softening the MHE.
+
+TBW.
+"""
+function relaxÂ(ex̄::AbstractMatrix{NT}, EX̂, C_âmin, C_âmax, nε) where NT<:Real
+    nx̂, nZ = size(ex̄)
+    nX̂, nAe  = size(EX̂, 1), length(C_âmin)
+    Tâ = [spzeros(NT, nAe, nx̂+nX̂) I spzeros(NT, nAe, nZ-nx̂-nX̂-nAe)]
+    if iszero(nAe) # no algebraic variable at all
+        A_Âmin, A_Âmax = spzeros(NT, 0, nZ), spzeros(NT, 0, nZ)
+    elseif nε ≠ 0 # Z̃ = [ε; Z]
+        A_Âmin, A_Âmax = -[C_âmin Tâ], [-C_âmax Tâ]
+    else # Z̃ = Z (only hard constraints)
+        A_Âmin, A_Âmax = -Tâ, Tâ
+    end
+    return A_Âmin, A_Âmax
+end
+
 @doc raw"""
     relaxŴ(Tŵ, C_ŵmin, C_ŵmax, nε) -> A_Ŵmin, A_Ŵmax
 
@@ -1326,25 +1403,30 @@ end
 """
     init_boxconstraint_mhe(
         model::SimModel, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
-        A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
+        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax,  Ŵmin,   Ŵmax, 
+        A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
+        A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
     ) -> Z̃min, Z̃max
 
 Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHorizonEstimator`](@ref).
 """
 function init_boxconstraint_mhe(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Ŵmin,   Ŵmax, 
-    A_x̂min, A_x̂max, C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
+    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax,  Ŵmin,   Ŵmax, 
+    A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
+    A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
     nk̄, na = get_nk̄(model, transcription), get_na(model)
     nZ̃ = nε + get_nZ_mhe(transcription, He, nx̂, nk̄, nŵ, na)
+    nX̂, nÂe = nx̂*He, na*(He+1)
     Z̃min, Z̃max = fill(convert(NT,-Inf), nZ̃), fill(convert(NT,+Inf), nZ̃)
     nε > 0 && (Z̃min[begin] = 0)
     nŴ = nŵ*He
     if nε > 0
         n_C_x̂min = @views A_x̂min[:, begin]
         n_C_x̂max = @views A_x̂max[:, begin]
+        n_C_Âmin = @views A_Âmin[:, begin]
+        n_C_Âmax = @views A_Âmax[:, begin]
         n_C_Ŵmin = @views A_Ŵmin[:, begin]
         n_C_Ŵmax = @views A_Ŵmax[:, begin]
         for i in eachindex(x̂0min)
@@ -1353,17 +1435,25 @@ function init_boxconstraint_mhe(
         for i in eachindex(x̂0max)
             iszero(n_C_x̂max[i]) && (Z̃max[nε + i] = x̂0max[i])
         end
+        for i in eachindex(Âmin)
+            iszero(n_C_Âmin[i]) && (Z̃min[nε + nx̂ + nX̂ + i] = Âmin[i])
+        end
+        for i in eachindex(Âmax)
+            iszero(n_C_Âmax[i]) && (Z̃max[nε + nx̂ + nX̂ + i] = Âmax[i])
+        end
         for i in eachindex(Ŵmin)
             iszero(n_C_Ŵmin[i]) && (Z̃min[nZ̃ - nŴ + i] = Ŵmin[i])
         end
         for i in eachindex(Ŵmax)
-            iszero(n_C_Ŵmax[i]) && (Z̃min[nZ̃ - nŴ + i] = Ŵmax[i])
+            iszero(n_C_Ŵmax[i]) && (Z̃max[nZ̃ - nŴ + i] = Ŵmax[i])
         end
     else
-        Z̃min[1:nx̂] .= x̂0min
-        Z̃max[1:nx̂] .= x̂0max
-        Z̃min[nZ̃-nŴ+1:end] .= Ŵmin
-        Z̃max[nZ̃-nŴ+1:end] .= Ŵmax
+        Z̃min[1:nx̂]              .= x̂0min
+        Z̃max[1:nx̂]              .= x̂0max
+        Z̃min[1+nx̂+nX̂:nx̂+nX̂+nÂe] .= Âmin
+        Z̃max[1+nx̂+nX̂:nx̂+nX̂+nÂe] .= Âmax     
+        Z̃min[nZ̃-nŴ+1:end]       .= Ŵmin
+        Z̃max[nZ̃-nŴ+1:end]       .= Ŵmax
     end
     Z̃min, Z̃max = boxconstraint_states!(
         Z̃min, Z̃max, transcription, nx̂, nε, X̂0min, X̂0max, C_x̂min, C_x̂max
