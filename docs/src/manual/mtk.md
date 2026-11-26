@@ -47,7 +47,7 @@ function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
             f_ip_with_d(ẋ, x, u, p, nothing, d)
         catch err
             if err isa MethodError
-                error("NonLinModel does not support a time argument t in the f "*
+                error("NonLinModel(DAE) does not support a time argument t in the f "*
                     "function, see the constructor docstring for a workaround.")
             else
                 rethrow()
@@ -68,7 +68,7 @@ function generate_f_h_mtk(model, inputs, outputs, disturbances=nothing)
             h_ip_with_d(y, x, u_nothing, p, nothing, d)
         catch err
             if err isa MethodError
-                error("NonLinModel only support strictly proper systems (no "*
+                error("This package only support strictly proper systems (no "*
                       "manipulated input argument u in the output function h)")
             else
                 rethrow()
