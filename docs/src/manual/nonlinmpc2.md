@@ -312,11 +312,12 @@ mhe = setconstraint!(mhe, x̂min=[0, 0, 0], âmin=[1.0], âmax=[14.0])
 ```
 
 The state constraints are shown in round brackets next to the decision variables. There are
-27 of them (3 states × 8 datapoints in the past + 3 arrival estimates). The arrival
-covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref), specified by
-`σP_0` argument. A proper tuning of `σP_0` and `He` reduces the impact of the constant
-arrival approximation. We can now reproduce the last simulated scenario and see how `mhe`
-performs under pH and flow rate measurement noise:
+45 of them (3 states × 8 datapoints in the past + 3 arrival point + 2 bounds × 1 alg. var. ×
+8 datapoints in the past + 2 bounds × 1 arrival point). The arrival covariance ``\mathbf{P̄}``
+is constant by default for [`NonLinModelDAE`](@ref), specified by `σP_0` argument. A proper
+tuning of `σP_0` and `He` reduces the impact of the constant arrival approximation. We can
+now reproduce the last simulated scenario and see how `mhe` performs under pH and flow rate
+measurement noise:
 
 ```@example 1
 using Random
