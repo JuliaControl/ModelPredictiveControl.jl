@@ -298,8 +298,9 @@ disturbed by a random-walk, instead of the measured output. Among all the settin
 `σR` and `σP_0`, and a past horizon `He` long enough to see the main dynamics can improve
 the stability on a highly nonlinear and stiff plant model like here. An exact Hessian matrix
 with `hessian=true` also helps for DAEs, since the dynamics are encoded in the nonlinear
-equality constraints. We can also bound the three estimated states to positive values since
-they are concentrations in mol/L:
+equality constraints. We can also bound the three estimated states ``\mathbf{x̂}`` to
+positive values since they are concentrations in mol/L, and the estimated algebraic
+``\mathbf{â}`` to valid pH values:
 
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
@@ -307,15 +308,16 @@ He = 8; hessian = true
 σQ = [0.5e-3, 0.5e-3, 0.9e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
-mhe = setconstraint!(mhe, x̂min=[0, 0, 0])
+mhe = setconstraint!(mhe, x̂min=[0, 0, 0], âmin=[1.0], âmax=[14.0])
 ```
 
 The state constraints are shown in round brackets next to the decision variables. There are
-27 of them (3 states × 8 datapoints in the past + 3 arrival estimates). The arrival
-covariance ``\mathbf{P̄}`` is constant by default for [`NonLinModelDAE`](@ref), specified by
-`σP_0` argument. A proper tuning of `σP_0` and `He` reduces the impact of the constant
-arrival approximation. We can now reproduce the last simulated scenario and see how `mhe`
-performs under pH and flow rate measurement noise:
+45 of them (3 states × 8 datapoints in the past + 3 arrival point + 2 bounds × 1 alg. var. ×
+8 datapoints in the past + 2 bounds × 1 arrival point). The arrival covariance ``\mathbf{P̄}``
+is constant by default for [`NonLinModelDAE`](@ref), specified by `σP_0` argument. A proper
+tuning of `σP_0` and `He` reduces the impact of the constant arrival approximation. We can
+now reproduce the last simulated scenario and see how `mhe` performs under pH and flow rate
+measurement noise:
 
 ```@example 1
 using Random

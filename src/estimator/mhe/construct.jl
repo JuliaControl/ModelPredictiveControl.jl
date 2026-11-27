@@ -813,7 +813,7 @@ end
 Set the bound constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
 It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, algebraic
-variable ``\mathbf{â}`` (for [`NonLinModelDAE](@ref)), process noise ``\mathbf{ŵ}`` and
+variable ``\mathbf{â}`` (for [`NonLinModelDAE`](@ref)), process noise ``\mathbf{ŵ}`` and
 sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
@@ -898,7 +898,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
     - `Âmin` / `Âmax` / `C_âmin` / `C_âmax` : ``\mathbf{Â_e}`` constraints `(na*(He+1),)`.
     - `Ŵmin` / `Ŵmax` / `C_ŵmin` / `C_ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
     - `V̂min` / `V̂max` / `C_v̂min` / `C_v̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
-    The subscript ``\mathbf{e}`` stands for extended with the arrival estimate.
+    The subscript ``\mathbf{e}`` stands for "extended with the arrival estimate".
 """
 function setconstraint!(
     estim::MovingHorizonEstimator; 
@@ -974,7 +974,7 @@ function setconstraint!(
         con.Âmin .= Âmin
     end
     if isnothing(Âmax) && !isnothing(âmax)
-        size(âmax) == (na,) || throw(DimensionMismatch("âmax size must be $((nxa,))"))
+        size(âmax) == (na,) || throw(DimensionMismatch("âmax size must be $((na,))"))
         for i in 1:(na*(He+1))
             con.Âmax[i] = âmax[(i-1) % na + 1]
         end
@@ -1052,12 +1052,12 @@ function setconstraint!(
         if !isnothing(C_âmin)
             size(C_âmin) == (nÂe,) || throw(DimensionMismatch("C_âmin size must be $((nÂe,))"))
             any(C_âmin .< 0) && error("C_âmin weights should be non-negative")
-            con.A_âmin[:, begin] .= @. -C_âmin 
+            con.A_Âmin[:, begin] .= @. -C_âmin 
         end
         if !isnothing(C_âmax)
             size(C_âmax) == (nÂe,) || throw(DimensionMismatch("C_âmax size must be $((nÂe,))"))
             any(C_âmax .< 0) && error("C_âmax weights should be non-negative")
-            con.A_âmax[:, begin] .= @. -C_âmax
+            con.A_Âmax[:, begin] .= @. -C_âmax
         end
         if !isnothing(C_ŵmin)
             size(C_ŵmin) == (nŵ*He,) || throw(DimensionMismatch("C_ŵmin size must be $((nŵ*He,))"))
@@ -1212,8 +1212,8 @@ function init_defaultcon_mhe(
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
         x̂0min,  x̂0max,  X̂0min,  X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, 
-        A_x̂min, A_x̂max, A_Âmin, A_Âmax, 
-        C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
+        A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
+        A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
         model, transcription, Z̃min, Z̃max, nc, nε,
@@ -1403,7 +1403,7 @@ end
 """
     init_boxconstraint_mhe(
         model::SimModel, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax,  Ŵmin,   Ŵmax, 
+        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax, Ŵmin, Ŵmax, 
         A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
         A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
     ) -> Z̃min, Z̃max
@@ -1412,7 +1412,7 @@ Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHor
 """
 function init_boxconstraint_mhe(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax,  Ŵmin,   Ŵmax, 
+    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax, Ŵmin, Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
     A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
