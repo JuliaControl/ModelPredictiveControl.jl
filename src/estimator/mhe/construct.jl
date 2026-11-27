@@ -1212,8 +1212,8 @@ function init_defaultcon_mhe(
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
         x̂0min,  x̂0max,  X̂0min,  X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, 
-        A_x̂min, A_x̂max, A_Âmin, A_Âmax, 
-        C_x̂min, C_x̂max, A_Ŵmin, A_Ŵmax
+        A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
+        A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
     )
     i_b, i_g, A, Aeq, neq = init_matconstraint_mhe(
         model, transcription, Z̃min, Z̃max, nc, nε,
@@ -1403,7 +1403,7 @@ end
 """
     init_boxconstraint_mhe(
         model::SimModel, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax,  Ŵmin,   Ŵmax, 
+        x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax, Ŵmin, Ŵmax, 
         A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
         A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
     ) -> Z̃min, Z̃max
@@ -1412,7 +1412,7 @@ Init the decision variable box constraints `Z̃min` and `Z̃max` for [`MovingHor
 """
 function init_boxconstraint_mhe(
     model::SimModel{NT}, transcription::TranscriptionMethod, He, nx̂, nŵ, nε,
-    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax,  Ŵmin,   Ŵmax, 
+    x̂0min,  x̂0max,  X̂0min,  X̂0max,  Âmin,  Âmax, Ŵmin, Ŵmax, 
     A_x̂min, A_x̂max, C_x̂min, C_x̂max, 
     A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax
 ) where {NT<:Real}
