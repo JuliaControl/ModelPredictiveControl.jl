@@ -583,12 +583,11 @@ function add_data_windows!(estim::MovingHorizonEstimator, y0m, d0, u0=estim.last
     return ismoving
 end
 
-"Truncate the bounds `Bmin` and `Bmax` to the window size `Nk` if `Nk < He`."
-function trunc_bounds(estim::MovingHorizonEstimator{NT}, Bmin, Bmax, n) where NT<:Real
-    He, Nk = estim.He, estim.Nk[]
-    if Nk < He
-        nB = n*Nk
-        Bmin_t, Bmax_t = similar(Bmin), similar(Bmax)
+"Truncate the bounds `Bmin` and `Bmax` to the window size `N` if `Nk < He`."
+function trunc_bounds(estim::MovingHorizonEstimator, Bmin, Bmax, n, N=estim.Nk[]) 
+    if estim.Nk[] < estim.He
+        nB = n*N
+        Bmin_t, Bmax_t    = similar(Bmin), similar(Bmax)
         Bmin_t[1:nB]     .= @views Bmin[end-nB+1:end]
         Bmin_t[nB+1:end] .= -Inf
         Bmax_t[1:nB]     .= @views Bmax[end-nB+1:end]

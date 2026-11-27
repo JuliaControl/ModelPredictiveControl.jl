@@ -897,7 +897,6 @@ function linconstraint!(
     model.nd > 0 && mul!(FX̂, JX̂, D0, 1, 1)
     # --- update b vector for linear inequality constraints ---
     nX̂_He, nŴ_He, nV̂_He = length(X̂0min), length(Ŵmin), length(V̂min)
-    nx̂ = length(estim.con.x̂0min)
     n = 0
     estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
     n += nx̂
@@ -923,14 +922,15 @@ end
 
 "Set `b` excluding sensor noise bounds if not a `LinModel` and non-`SingleShooting`."
 function linconstraint!(
-    estim::MovingHorizonEstimator, ::SimModel, ::TranscriptionMethod
+    estim::MovingHorizonEstimator, model::SimModel, ::TranscriptionMethod
 )
-    nx̂, nŵ = estim.nx̂, estim.nx̂
+    nx̂, nŵ, na = estim.nx̂, estim.nx̂, get_na(model)
     # --- truncate vector and matrices if necessary ---
     X̂0min, X̂0max = trunc_bounds(estim, estim.con.X̂0min, estim.con.X̂0max, nx̂)
     Ŵmin, Ŵmax = trunc_bounds(estim, estim.con.Ŵmin, estim.con.Ŵmax, nŵ)
+    Âmin, Âmax = trunc_bounds(estim, estim.con.Âmin, estim.con.Âmax, na, estim.Nk[]+1)
     # --- update b vector for linear inequality constraints ---
-    nx̂, nŴ_He, nX̂_He = length(estim.con.x̂0min), length(Ŵmin), length(X̂0min)
+    nŴ_He, nX̂_He, nÂe_He = length(Ŵmin), length(X̂0min), length(Âmin)
     n = 0
     estim.con.b[(n+1):(n+nx̂)] .= @. -estim.con.x̂0min
     n += nx̂
@@ -940,6 +940,10 @@ function linconstraint!(
     n += nX̂_He
     estim.con.b[(n+1):(n+nX̂_He)] .= @. +X̂0max - estim.con.FX̂
     n += nX̂_He
+    estim.con.b[(n+1):(n+nÂe_He)] .= @. -Âmin
+    n += nÂe_He
+    estim.con.b[(n+1):(n+nÂe_He)] .= @. +Âmax
+    n += nÂe_He
     estim.con.b[(n+1):(n+nŴ_He)] .= @. -Ŵmin
     n += nŴ_He
     estim.con.b[(n+1):(n+nŴ_He)] .= @. +Ŵmax
