@@ -974,7 +974,7 @@ function setconstraint!(
         con.Âmin .= Âmin
     end
     if isnothing(Âmax) && !isnothing(âmax)
-        size(âmax) == (na,) || throw(DimensionMismatch("âmax size must be $((nxa,))"))
+        size(âmax) == (na,) || throw(DimensionMismatch("âmax size must be $((na,))"))
         for i in 1:(na*(He+1))
             con.Âmax[i] = âmax[(i-1) % na + 1]
         end
