@@ -298,8 +298,9 @@ disturbed by a random-walk, instead of the measured output. Among all the settin
 `σR` and `σP_0`, and a past horizon `He` long enough to see the main dynamics can improve
 the stability on a highly nonlinear and stiff plant model like here. An exact Hessian matrix
 with `hessian=true` also helps for DAEs, since the dynamics are encoded in the nonlinear
-equality constraints. We can also bound the three estimated states to positive values since
-they are concentrations in mol/L:
+equality constraints. We can also bound the three estimated states ``\mathbf{x̂}`` to
+positive values since they are concentrations in mol/L, and the estimated algebraic
+``\mathbf{â}`` to valid pH values:
 
 ```@example 1
 nint_ym=0; nint_u=0;                            # disable the default stochastic model
