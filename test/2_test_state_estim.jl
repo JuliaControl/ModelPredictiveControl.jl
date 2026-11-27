@@ -2021,7 +2021,7 @@ end
     p = [0.001]
     as_0, xs_0 = [-1.0], [1.0]
     dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
-#=
+
     transcription = TrapezoidalCollocation()
     mhe2 = MovingHorizonEstimator(dae, He=1, nint_ym=0; transcription)
 
@@ -2038,8 +2038,8 @@ end
 
     info = getinfo(mhe2)
     @test info[:â] ≈ [-1.0] atol=5e-2
-=#
-    transcription =  TrapezoidalCollocation()#OrthogonalCollocation(0, 2, roots=:gausslegendre)
+
+    transcription = OrthogonalCollocation(0, 2, roots=:gausslegendre)
     mhe3 = MovingHorizonEstimator(dae; He=1, nint_ym=0, Cwt=1e4, transcription)
 
     setconstraint!(mhe3, c_âmin=[1], c_âmax=[1])
@@ -2049,7 +2049,6 @@ end
     updatestate!(mhe3, [10.0], [0.0], [0.0])
     
     info = getinfo(mhe3)
-    @show info[:ε]
     @test info[:â] ≈ [1.0] atol=5e-2
 
     setconstraint!(mhe3, âmin=[-100], âmax=[-1])
@@ -2057,7 +2056,6 @@ end
     updatestate!(mhe3, [10.0], [0.0], [0.0])
 
     info = getinfo(mhe3)
-    @show info[:ε]
     @test info[:â] ≈ [-1.0] atol=5e-2
 
 end
