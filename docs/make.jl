@@ -40,6 +40,7 @@ makedocs(
             "Installation" => "manual/installation.md",
             "Examples" => [
                 "Linear Design" => "manual/linmpc.md",
+                "Siemens SCL example" => "manual/siemens_scl.md",
                 "Nonlinear Design (ODE)" => "manual/nonlinmpc1.md",
                 "Nonlinear Design (DAE)" => "manual/nonlinmpc2.md",
                 "ModelingToolkit" =>  "manual/mtk.md",

@@ -1,0 +1,413 @@
+TYPE "T_CSTR_MPC_QP"
+VERSION : 1.0
+STRUCT
+    H : ARRAY[1..5, 1..5] OF LREAL;
+    Q : ARRAY[1..5] OF LREAL;
+    A : ARRAY[1..11, 1..5] OF LREAL;
+    Lower : ARRAY[1..11] OF LREAL;
+    Upper : ARRAY[1..11] OF LREAL;
+END_STRUCT;
+END_TYPE
+
+FUNCTION "FC_CSTR_QP_ADMM" : Bool
+VERSION : 1.0
+VAR_INPUT
+    Problem : "T_CSTR_MPC_QP";
+END_VAR
+VAR_OUTPUT
+    Solution : ARRAY[1..5] OF LREAL;
+END_VAR
+VAR_TEMP
+    System : ARRAY[1..5, 1..5] OF LREAL;
+    Work : ARRAY[1..5, 1..5] OF LREAL;
+    Rhs : ARRAY[1..5] OF LREAL;
+    X : ARRAY[1..5] OF LREAL;
+    Ax : ARRAY[1..11] OF LREAL;
+    Z : ARRAY[1..11] OF LREAL;
+    ZOld : ARRAY[1..11] OF LREAL;
+    Dual : ARRAY[1..11] OF LREAL;
+    PrimalResidual : LREAL;
+    DualResidual : LREAL;
+    Value : LREAL;
+    Factor : LREAL;
+    SwapValue : LREAL;
+    MaxValue : LREAL;
+    Rho : LREAL;
+    Tolerance : LREAL;
+    Pivot : INT;
+    I : INT;
+    J : INT;
+    K : INT;
+    Row : INT;
+    Iteration : INT;
+    Converged : Bool;
+    LinearSolveOK : Bool;
+END_VAR
+BEGIN
+    "FC_CSTR_QP_ADMM" := FALSE;
+    #Rho := 10.0;
+    #Tolerance := 0.0001;
+    #Converged := FALSE;
+
+    FOR #I := 1 TO 5 DO
+        #Solution[#I] := 0.0;
+        FOR #J := 1 TO 5 DO
+            #System[#I, #J] := #Problem.H[#I, #J];
+            FOR #Row := 1 TO 11 DO
+                #System[#I, #J] := #System[#I, #J]
+                    + #Rho * #Problem.A[#Row, #I] * #Problem.A[#Row, #J];
+            END_FOR;
+        END_FOR;
+    END_FOR;
+
+    FOR #Row := 1 TO 11 DO
+        #Z[#Row] := 0.0;
+        #Dual[#Row] := 0.0;
+        #Value := 0.0;
+        FOR #J := 1 TO 5 DO
+            #Value := #Value + #Problem.A[#Row, #J] * #Solution[#J];
+        END_FOR;
+        #Z[#Row] := #Value;
+        IF #Z[#Row] < #Problem.Lower[#Row] THEN
+            #Z[#Row] := #Problem.Lower[#Row];
+        ELSIF #Z[#Row] > #Problem.Upper[#Row] THEN
+            #Z[#Row] := #Problem.Upper[#Row];
+        END_IF;
+    END_FOR;
+
+    FOR #Iteration := 1 TO 250 DO
+        IF #Converged THEN
+            EXIT;
+        END_IF;
+
+        FOR #I := 1 TO 5 DO
+            #Rhs[#I] := -#Problem.Q[#I];
+            FOR #Row := 1 TO 11 DO
+                #Rhs[#I] := #Rhs[#I] + #Rho * #Problem.A[#Row, #I]
+                    * (#Z[#Row] - #Dual[#Row]);
+            END_FOR;
+        END_FOR;
+
+        #Work := #System;
+        #LinearSolveOK := TRUE;
+        FOR #K := 1 TO 5 DO
+            #Pivot := #K;
+            #MaxValue := ABS(#Work[#K, #K]);
+            FOR #Row := #K + 1 TO 5 DO
+                IF ABS(#Work[#Row, #K]) > #MaxValue THEN
+                    #Pivot := #Row;
+                    #MaxValue := ABS(#Work[#Row, #K]);
+                END_IF;
+            END_FOR;
+            IF #MaxValue < 1.0E-12 THEN
+                #LinearSolveOK := FALSE;
+                EXIT;
+            END_IF;
+            IF #Pivot <> #K THEN
+                FOR #J := 1 TO 5 DO
+                    #SwapValue := #Work[#K, #J];
+                    #Work[#K, #J] := #Work[#Pivot, #J];
+                    #Work[#Pivot, #J] := #SwapValue;
+                END_FOR;
+                #SwapValue := #Rhs[#K];
+                #Rhs[#K] := #Rhs[#Pivot];
+                #Rhs[#Pivot] := #SwapValue;
+            END_IF;
+            FOR #Row := #K + 1 TO 5 DO
+                #Factor := #Work[#Row, #K] / #Work[#K, #K];
+                FOR #J := #K TO 5 DO
+                    #Work[#Row, #J] := #Work[#Row, #J]
+                        - #Factor * #Work[#K, #J];
+                END_FOR;
+                #Rhs[#Row] := #Rhs[#Row] - #Factor * #Rhs[#K];
+            END_FOR;
+        END_FOR;
+        IF NOT #LinearSolveOK THEN
+            RETURN;
+        END_IF;
+
+        FOR #I := 5 TO 1 BY -1 DO
+            #Value := #Rhs[#I];
+            FOR #J := #I + 1 TO 5 DO
+                #Value := #Value - #Work[#I, #J] * #X[#J];
+            END_FOR;
+            #X[#I] := #Value / #Work[#I, #I];
+        END_FOR;
+
+        FOR #Row := 1 TO 11 DO
+            #ZOld[#Row] := #Z[#Row];
+            #Ax[#Row] := 0.0;
+            FOR #J := 1 TO 5 DO
+                #Ax[#Row] := #Ax[#Row] + #Problem.A[#Row, #J] * #X[#J];
+            END_FOR;
+            #Value := #Ax[#Row] + #Dual[#Row];
+            IF #Value < #Problem.Lower[#Row] THEN
+                #Z[#Row] := #Problem.Lower[#Row];
+            ELSIF #Value > #Problem.Upper[#Row] THEN
+                #Z[#Row] := #Problem.Upper[#Row];
+            ELSE
+                #Z[#Row] := #Value;
+            END_IF;
+            #Dual[#Row] := #Dual[#Row] + #Ax[#Row] - #Z[#Row];
+        END_FOR;
+
+        #PrimalResidual := 0.0;
+        #DualResidual := 0.0;
+        FOR #Row := 1 TO 11 DO
+            #PrimalResidual := MAX(
+                IN1 := #PrimalResidual,
+                IN2 := ABS(#Ax[#Row] - #Z[#Row]));
+        END_FOR;
+        FOR #I := 1 TO 5 DO
+            #Value := 0.0;
+            FOR #Row := 1 TO 11 DO
+                #Value := #Value + #Problem.A[#Row, #I]
+                    * (#Z[#Row] - #ZOld[#Row]);
+            END_FOR;
+            #DualResidual := MAX(
+                IN1 := #DualResidual,
+                IN2 := #Rho * ABS(#Value));
+        END_FOR;
+        #Converged := (#PrimalResidual < #Tolerance)
+            AND (#DualResidual < #Tolerance);
+    END_FOR;
+
+    IF #Converged THEN
+        #Solution := #X;
+        "FC_CSTR_QP_ADMM" := TRUE;
+    END_IF;
+END_FUNCTION
+
+FUNCTION_BLOCK "FB_CSTR_LinMPC_S7"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 1.0
+VAR_INPUT
+    Measurement : ARRAY[1..2] OF LREAL;
+    Disturbance : LREAL;
+    Reference : ARRAY[1..2] OF LREAL;
+    Reset : Bool;
+    InitialState : ARRAY[1..6] OF LREAL;
+    InitialControl : ARRAY[1..2] OF LREAL;
+END_VAR
+VAR_OUTPUT
+    Control : ARRAY[1..2] OF LREAL;
+    SolverOK : Bool;
+END_VAR
+VAR
+    State : ARRAY[1..6] OF LREAL;
+    LastControl : ARRAY[1..2] OF LREAL;
+    Initialized : Bool;
+END_VAR
+VAR_TEMP
+    Problem : "T_CSTR_MPC_QP";
+    CorrectedState : ARRAY[1..6] OF LREAL;
+    BaseState : ARRAY[1..6] OF LREAL;
+    NextBaseState : ARRAY[1..6] OF LREAL;
+    ResponseState : ARRAY[1..4, 1..6] OF LREAL;
+    NextResponseState : ARRAY[1..4, 1..6] OF LREAL;
+    Phi : ARRAY[1..10, 1..4, 1..2] OF LREAL;
+    BaseOutput : ARRAY[1..10, 1..2] OF LREAL;
+    Innovation : LREAL;
+    ActiveMove : LREAL;
+    Solution : ARRAY[1..5] OF LREAL;
+    I : INT;
+    J : INT;
+    K : INT;
+    T : INT;
+    Move : INT;
+    Channel : INT;
+    Decision : INT;
+    OutputIndex : INT;
+END_VAR
+VAR CONSTANT
+    // Fixed matrices for the documented CSTR feedforward model (absolute u and d).
+    A : ARRAY[1..36] OF LREAL := [
+        0.894768583793, 0.0, 0.0000473833883455, 0.0, 0.0, 0.0,
+        0.0, 0.778067478392, 0.0, 0.000460910854713, 0.0, 0.0,
+        0.0000473833883455, 0.0, 0.894807575126, 0.0, 0.0, 0.0,
+        0.0, 0.000460910854713, 0.0, 0.778511082457, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+    Bu : ARRAY[1..12] OF LREAL := [
+        -0.18623340238, -0.18623340238,
+        0.332938751096, -0.332938751096,
+        -0.27800568138, -0.27800568138,
+        0.529702309394, -0.529702309394,
+        0.0, 0.0, 0.0, 0.0];
+    Bd : ARRAY[1..6] OF LREAL := [
+        0.393542522502, 0.752576694707, -0.263630450223,
+        -0.473024074836, 0.0, 0.0];
+    F : ARRAY[1..6] OF LREAL := [
+        -0.421514354837, -15.0515338941, 16.3928362597,
+        9.46048149671, 0.0, 0.0];
+    C : ARRAY[1..12] OF LREAL := [
+        0.0, 0.0, -0.718709405724, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, -0.309017758889, 0.0, 1.0];
+    Dd : ARRAY[1..2] OF LREAL := [0.1, 0.0822222222222];
+    YOffset : ARRAY[1..2] OF LREAL := [48.0, 28.3555555556];
+    K : ARRAY[1..12] OF LREAL := [
+        -0.0000000535587676, 0.0,
+        0.0, 0.0000000448123766,
+        -0.0135590195903, 0.0,
+        0.0, -0.00588796749927,
+        0.613667367345, 0.0,
+        0.0, 0.617219993322];
+END_VAR
+BEGIN
+    IF (NOT #Initialized) OR #Reset THEN
+        FOR #I := 1 TO 6 DO
+            #State[#I] := #InitialState[#I];
+        END_FOR;
+        FOR #I := 1 TO 2 DO
+            #LastControl[#I] := #InitialControl[#I];
+            #Control[#I] := #InitialControl[#I];
+        END_FOR;
+        #Initialized := TRUE;
+    END_IF;
+
+    #CorrectedState := #State;
+    FOR #OutputIndex := 1 TO 2 DO
+        #Innovation := #Measurement[#OutputIndex] - #YOffset[#OutputIndex]
+            - #Dd[#OutputIndex] * #Disturbance;
+        FOR #I := 1 TO 6 DO
+            #Innovation := #Innovation
+                - #C[(#OutputIndex - 1) * 6 + #I] * #State[#I];
+        END_FOR;
+        FOR #I := 1 TO 6 DO
+            #CorrectedState[#I] := #CorrectedState[#I]
+                + #K[(#I - 1) * 2 + #OutputIndex] * #Innovation;
+        END_FOR;
+    END_FOR;
+
+    FOR #I := 1 TO 5 DO
+        #Problem.Q[#I] := 0.0;
+        FOR #J := 1 TO 5 DO
+            #Problem.H[#I, #J] := 0.0;
+        END_FOR;
+    END_FOR;
+    FOR #T := 1 TO 11 DO
+        #Problem.Lower[#T] := 0.0;
+        #Problem.Upper[#T] := 1.0E30;
+        FOR #J := 1 TO 5 DO
+            #Problem.A[#T, #J] := 0.0;
+        END_FOR;
+    END_FOR;
+    FOR #Decision := 1 TO 4 DO
+        #ResponseState[#Decision, 1] := 0.0;
+        #ResponseState[#Decision, 2] := 0.0;
+        #ResponseState[#Decision, 3] := 0.0;
+        #ResponseState[#Decision, 4] := 0.0;
+        #ResponseState[#Decision, 5] := 0.0;
+        #ResponseState[#Decision, 6] := 0.0;
+    END_FOR;
+    #BaseState := #CorrectedState;
+
+    FOR #T := 1 TO 10 DO
+        FOR #I := 1 TO 6 DO
+            #NextBaseState[#I] := #F[#I] + #Bd[#I] * #Disturbance;
+            FOR #J := 1 TO 6 DO
+                #NextBaseState[#I] := #NextBaseState[#I]
+                    + #A[(#I - 1) * 6 + #J] * #BaseState[#J];
+            END_FOR;
+            FOR #Channel := 1 TO 2 DO
+                #NextBaseState[#I] := #NextBaseState[#I]
+                    + #Bu[(#I - 1) * 2 + #Channel] * #LastControl[#Channel];
+            END_FOR;
+        END_FOR;
+        #BaseState := #NextBaseState;
+        FOR #OutputIndex := 1 TO 2 DO
+            #BaseOutput[#T, #OutputIndex] := #YOffset[#OutputIndex]
+                + #Dd[#OutputIndex] * #Disturbance;
+            FOR #I := 1 TO 6 DO
+                #BaseOutput[#T, #OutputIndex] := #BaseOutput[#T, #OutputIndex]
+                    + #C[(#OutputIndex - 1) * 6 + #I] * #BaseState[#I];
+            END_FOR;
+        END_FOR;
+
+        FOR #Move := 1 TO 2 DO
+            FOR #Channel := 1 TO 2 DO
+                #Decision := (#Move - 1) * 2 + #Channel;
+                #ActiveMove := 0.0;
+                IF #T >= #Move THEN
+                    #ActiveMove := 1.0;
+                END_IF;
+                FOR #I := 1 TO 6 DO
+                    #NextResponseState[#Decision, #I] := 0.0;
+                    FOR #J := 1 TO 6 DO
+                        #NextResponseState[#Decision, #I] :=
+                            #NextResponseState[#Decision, #I]
+                            + #A[(#I - 1) * 6 + #J]
+                                * #ResponseState[#Decision, #J];
+                    END_FOR;
+                    #NextResponseState[#Decision, #I] :=
+                        #NextResponseState[#Decision, #I]
+                        + #Bu[(#I - 1) * 2 + #Channel] * #ActiveMove;
+                END_FOR;
+                FOR #I := 1 TO 6 DO
+                    #ResponseState[#Decision, #I] :=
+                        #NextResponseState[#Decision, #I];
+                END_FOR;
+                FOR #OutputIndex := 1 TO 2 DO
+                    #Phi[#T, #Decision, #OutputIndex] := 0.0;
+                    FOR #I := 1 TO 6 DO
+                        #Phi[#T, #Decision, #OutputIndex] :=
+                            #Phi[#T, #Decision, #OutputIndex]
+                            + #C[(#OutputIndex - 1) * 6 + #I]
+                                * #ResponseState[#Decision, #I];
+                    END_FOR;
+                END_FOR;
+            END_FOR;
+        END_FOR;
+    END_FOR;
+
+    FOR #I := 1 TO 4 DO
+        #Problem.H[#I, #I] := 0.2;
+        FOR #T := 1 TO 10 DO
+            #Problem.Q[#I] := #Problem.Q[#I]
+                + 2.0 * (
+                    #Phi[#T, #I, 1] * (#BaseOutput[#T, 1] - #Reference[1])
+                    + #Phi[#T, #I, 2] * (#BaseOutput[#T, 2] - #Reference[2]));
+            FOR #J := 1 TO 4 DO
+                #Problem.H[#I, #J] := #Problem.H[#I, #J]
+                    + 2.0 * (
+                        #Phi[#T, #I, 1] * #Phi[#T, #J, 1]
+                        + #Phi[#T, #I, 2] * #Phi[#T, #J, 2]);
+            END_FOR;
+        END_FOR;
+    END_FOR;
+    #Problem.H[5, 5] := 200000.0;
+
+    FOR #T := 1 TO 10 DO
+        FOR #J := 1 TO 4 DO
+            #Problem.A[#T, #J] := #Phi[#T, #J, 1];
+        END_FOR;
+        #Problem.A[#T, 5] := 1.0;
+        #Problem.Lower[#T] := 48.0 - #BaseOutput[#T, 1];
+    END_FOR;
+    #Problem.A[11, 5] := 1.0;
+    #Problem.Lower[11] := 0.0;
+
+    #SolverOK := "FC_CSTR_QP_ADMM"(
+        Problem := #Problem,
+        Solution => #Solution);
+
+    IF #SolverOK THEN
+        #Control[1] := #LastControl[1] + #Solution[1];
+        #Control[2] := #LastControl[2] + #Solution[2];
+    ELSE
+        #Control := #LastControl;
+    END_IF;
+
+    FOR #I := 1 TO 6 DO
+        #State[#I] := #F[#I] + #Bd[#I] * #Disturbance;
+        FOR #J := 1 TO 6 DO
+            #State[#I] := #State[#I]
+                + #A[(#I - 1) * 6 + #J] * #CorrectedState[#J];
+        END_FOR;
+        FOR #Channel := 1 TO 2 DO
+            #State[#I] := #State[#I]
+                + #Bu[(#I - 1) * 2 + #Channel] * #Control[#Channel];
+        END_FOR;
+    END_FOR;
+    #LastControl := #Control;
+END_FUNCTION_BLOCK

@@ -397,3 +397,7 @@ x̂ = LinearMPC.correct_state!(c_mpc_d, [50, 30], [20])
 u = LinearMPC.compute_control(c_mpc_d, x̂; r=[50, 35], d=[20], uprev=[20, 20])
 println("The computed u value is: $(round.(u, digits=6))")
 ```
+
+For a fixed-size Siemens S7-1515F SCL example of this CSTR controller and its steady-state
+Kalman observer, see [Siemens SCL example](@ref manual_scl). It uses an SCL ADMM solver rather
+than DAQP.
