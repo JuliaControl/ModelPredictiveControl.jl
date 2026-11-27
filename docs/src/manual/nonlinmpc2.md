@@ -307,7 +307,7 @@ He = 8; hessian = true
 σQ = [0.5e-3, 0.5e-3, 0.9e-3]; σR=[0.05]; σP_0 = [0.05, 0.05, 1e-3]
 mhe = MovingHorizonEstimator(model; nint_ym, nint_u, He, hessian, σQ, σR, σP_0)
 using JuMP; unset_time_limit_sec(mhe.optim)     # no wall time limit during optimization
-mhe = setconstraint!(mhe, x̂min=[0, 0, 0], ahatmin=[0], ahatmax=[14])
+mhe = setconstraint!(mhe, x̂min=[0, 0, 0], âmin=[0], âmax=[14])
 ```
 
 The state constraints are shown in round brackets next to the decision variables. There are
