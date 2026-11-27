@@ -813,7 +813,7 @@ end
 Set the bound constraint parameters of the [`MovingHorizonEstimator`](@ref) `estim`.
    
 It supports both soft and hard constraints on the estimated state ``\mathbf{x̂}``, algebraic
-variable ``\mathbf{â}`` (for [`NonLinModelDAE](@ref)), process noise ``\mathbf{ŵ}`` and
+variable ``\mathbf{â}`` (for [`NonLinModelDAE`](@ref)), process noise ``\mathbf{ŵ}`` and
 sensor noise ``\mathbf{v̂}``:
 ```math 
 \begin{alignat*}{3}
