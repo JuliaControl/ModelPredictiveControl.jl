@@ -2007,6 +2007,61 @@ end
     @test getinfo(mhe2)[:Ŵ] ≈ zeros(nx̂) atol=5e-2
 end
 
+@testitem "MHE constraint violation (NonLinModelDAE)" setup=[SetupMPCtests] begin
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+
+    function fq!(ẋ, res, x, a, u, d, p)
+        ẋ[] = -p[] * (x[] - 0.2 * u[] - 0.2 * d[])
+        res[] = x[] - a[]
+        return nothing
+    end
+    function h!(y, x, a, d, _ )
+        y[] = 2 * x[] + a[] + 0.1 * d[]
+    end
+    p = [0.001]
+    as_0, xs_0 = [-1.0], [1.0]
+    dae = NonLinModelDAE(fq!, h!, 1000.0, 1, 1, 1, 1, 1; p, xs_0, as_0)
+#=
+    transcription = TrapezoidalCollocation()
+    mhe2 = MovingHorizonEstimator(dae, He=1, nint_ym=0; transcription)
+
+    setconstraint!(mhe2, âmin=[1], âmax=[100])
+    preparestate!(mhe2, [0.0], [0.0])
+    updatestate!(mhe2, [10.0], [0.0], [0.0])
+    
+    info = getinfo(mhe2)
+    @test info[:â] ≈ [1.0] atol=5e-2
+
+    setconstraint!(mhe2, âmin=[-100], âmax=[-1])
+    preparestate!(mhe2, [0.0], [0.0])
+    updatestate!(mhe2, [10.0], [0.0], [0.0])
+
+    info = getinfo(mhe2)
+    @test info[:â] ≈ [-1.0] atol=5e-2
+=#
+    transcription =  TrapezoidalCollocation()#OrthogonalCollocation(0, 2, roots=:gausslegendre)
+    mhe3 = MovingHorizonEstimator(dae; He=1, nint_ym=0, Cwt=1e4, transcription)
+
+    setconstraint!(mhe3, c_âmin=[1], c_âmax=[1])
+
+    setconstraint!(mhe3, âmin=[1], âmax=[100])
+    preparestate!(mhe3, [0.0], [0.0])
+    updatestate!(mhe3, [10.0], [0.0], [0.0])
+    
+    info = getinfo(mhe3)
+    @show info[:ε]
+    @test info[:â] ≈ [1.0] atol=5e-2
+
+    setconstraint!(mhe3, âmin=[-100], âmax=[-1])
+    preparestate!(mhe3, [0.0], [0.0])
+    updatestate!(mhe3, [10.0], [0.0], [0.0])
+
+    info = getinfo(mhe3)
+    @show info[:ε]
+    @test info[:â] ≈ [-1.0] atol=5e-2
+
+end
+
 @testitem "MHE set model" setup=[SetupMPCtests] begin
     using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
     linmodel = LinModel([0.5], [0.3], [1.0], 0, 0, 10.0)
