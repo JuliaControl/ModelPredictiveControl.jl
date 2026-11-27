@@ -1052,12 +1052,12 @@ function setconstraint!(
         if !isnothing(C_âmin)
             size(C_âmin) == (nÂe,) || throw(DimensionMismatch("C_âmin size must be $((nÂe,))"))
             any(C_âmin .< 0) && error("C_âmin weights should be non-negative")
-            con.A_âmin[:, begin] .= @. -C_âmin 
+            con.A_Âmin[:, begin] .= @. -C_âmin 
         end
         if !isnothing(C_âmax)
             size(C_âmax) == (nÂe,) || throw(DimensionMismatch("C_âmax size must be $((nÂe,))"))
             any(C_âmax .< 0) && error("C_âmax weights should be non-negative")
-            con.A_âmax[:, begin] .= @. -C_âmax
+            con.A_Âmax[:, begin] .= @. -C_âmax
         end
         if !isnothing(C_ŵmin)
             size(C_ŵmin) == (nŵ*He,) || throw(DimensionMismatch("C_ŵmin size must be $((nŵ*He,))"))
