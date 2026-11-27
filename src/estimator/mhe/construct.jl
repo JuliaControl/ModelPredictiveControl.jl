@@ -898,7 +898,7 @@ MovingHorizonEstimator estimator with a sample time Ts = 1.0 s:
     - `Âmin` / `Âmax` / `C_âmin` / `C_âmax` : ``\mathbf{Â_e}`` constraints `(na*(He+1),)`.
     - `Ŵmin` / `Ŵmax` / `C_ŵmin` / `C_ŵmax` : ``\mathbf{Ŵ}`` constraints `(nx̂*He,)`.
     - `V̂min` / `V̂max` / `C_v̂min` / `C_v̂max` : ``\mathbf{V̂}`` constraints `(nym*He,)`.
-    The subscript ``\mathbf{e}`` stands for extended with the arrival estimate.
+    The subscript ``\mathbf{e}`` stands for "extended with the arrival estimate".
 """
 function setconstraint!(
     estim::MovingHorizonEstimator; 
