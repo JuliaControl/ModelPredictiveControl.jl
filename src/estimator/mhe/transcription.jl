@@ -685,10 +685,17 @@ function init_defectmat_mhe_empty(
     return ES, GS, JS, BS
 end
 
+#=
+        model, transcription, Z̃min, Z̃max, nc, nε,
+        x̂0min, x̂0max, X̂0min, X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, V̂min, V̂max,
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, 
+        Aeq
+        =#
+
 @doc raw"""
     init_matconstraint_mhe(
         model::LinModel, transcription::ShootingMethod, Z̃min, Z̃max, nc, nε,
-        x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+        x̂0min, x̂0max, X̂0min, X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, V̂min, V̂max, args...
     ) -> i_b, i_g, A, Aeq, neq
 
 Init `i_b`, `i_g`, `neq`, and `A` and `Aeq` matrices for all the MHE constraints.
@@ -707,17 +714,17 @@ The argument `nc` is the number of custom nonlinear inequality constraints in
 finite numbers. `i_g` is a similar vector but for the indices of ``\mathbf{g}``. The method
 also returns the ``\mathbf{A, A_{eq}}`` matrices and `neq` if `args` is provided. In such a
 case, `args`  needs to contain all the inequality and equality constraint matrices: 
-`A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq`. The integer `neq` is
-the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
+`A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq`. The
+integer `neq` is the number of nonlinear equality constraints in ``\mathbf{g_{eq}}``.
 """
 function init_matconstraint_mhe(
     model::LinModel{NT}, transcription::ShootingMethod, Z̃min, Z̃max, nc, nε,
-    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+    x̂0min, x̂0max, X̂0min, X̂0max, _ , _ , Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq = args
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, _, _, A_Ŵmin, A_Ŵmax, A_V̂min, A_V̂max, Aeq = args
         A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax; A_V̂min; A_V̂max]
         neq = 0 # number of nonlinear equality constraints
     end
@@ -737,12 +744,12 @@ end
 "Init `i_b, A` without sensor noise and state constraints if `NonLinModel` and `SingleShooting`."
 function init_matconstraint_mhe(
     model::NonLinModel{NT}, transcription::SingleShooting, Z̃min, Z̃max, nc, nε,
-    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+    x̂0min, x̂0max, X̂0min, X̂0max, _ , _ , Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_x̂min, A_x̂max, _ , _ , A_Ŵmin, A_Ŵmax, _ , _ , Aeq = args
+        A_x̂min, A_x̂max, _ , _ , _ , _ , A_Ŵmin, A_Ŵmax, _ , _ , Aeq = args
         A = [A_x̂min; A_x̂max; A_Ŵmin; A_Ŵmax]
         neq = 0 # number of nonlinear equality constraints
     end
@@ -762,13 +769,13 @@ end
 "Init `i_b, A` without sensor noise constraints if not `LinModel` and other `TranscriptionMethod`."
 function init_matconstraint_mhe(
     model::SimModel{NT}, transcription::TranscriptionMethod, Z̃min, Z̃max, nc, nε,
-    x̂0min, x̂0max, X̂0min, X̂0max, Ŵmin, Ŵmax, V̂min, V̂max, args...
+    x̂0min, x̂0max, X̂0min, X̂0max, Âmin, Âmax, Ŵmin, Ŵmax, V̂min, V̂max, args...
 ) where {NT<:Real}
     if isempty(args)
         A, Aeq, neq = nothing, nothing, nothing
     else
-        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Ŵmin, A_Ŵmax, _ , _ , Aeq = args
-        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Ŵmin; A_Ŵmax]
+        A_x̂min, A_x̂max, A_X̂min, A_X̂max, A_Âmin, A_Âmax, A_Ŵmin, A_Ŵmax, _ , _ , Aeq = args
+        A = [A_x̂min; A_x̂max; A_X̂min; A_X̂max; A_Âmin; A_Âmax; A_Ŵmin; A_Ŵmax]
         nŴ, nZ̃ = size(A_Ŵmin)
         nx̂ = length(x̂0min)
         nAeq = size(Aeq, 1)                  # number of linear equality constraints
@@ -776,13 +783,15 @@ function init_matconstraint_mhe(
     end
     i_x̂min, i_x̂max  = @. !isinf(x̂0min), !isinf(x̂0max)
     i_X̂min, i_X̂max  = @. !isinf(X̂0min), !isinf(X̂0max)
+    i_Âmin, i_Âmax  = @. !isinf(Âmin),  !isinf(Âmax)
     i_Ŵmin, i_Ŵmax  = @. !isinf(Ŵmin),  !isinf(Ŵmax)
     i_V̂min, i_V̂max  = @. !isinf(V̂min),  !isinf(V̂max)
-    nx̂ = length(x̂0min)
+    nx̂, nX̂e = length(x̂0min), length(x̂0min) + length(X̂0min)
     deletex̂arr_lincon!(i_x̂min, i_x̂max, model, transcription, Z̃min, Z̃max, nε)
     deleteX̂_lincon!(i_X̂min, i_X̂max, model, transcription, Z̃min, Z̃max, nε, nx̂)
+    deleteÂ_lincon!(i_Âmin, i_Âmax, model, transcription, Z̃min, Z̃max, nε, nX̂e)
     deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, model, transcription, Z̃min, Z̃max)
-    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Ŵmin; i_Ŵmax]
+    i_b = [i_x̂min; i_x̂max; i_X̂min; i_X̂max; i_Âmin; i_Âmax; i_Ŵmin; i_Ŵmax]
     i_g = [i_V̂min; i_V̂max; trues(nc)]
     return i_b, i_g, A, Aeq, neq
 end
@@ -812,7 +821,7 @@ function deletex̂arr_lincon!(
     i_x̂min, i_x̂max, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max, nε
 )
     nx̂ = length(i_x̂min)
-    x̂0min, x̂0max = @views Z̃min[(nε+1):(nε+nx̂)], @views Z̃max[(nε+1):(nε+nx̂)]
+    x̂0min, x̂0max = @views Z̃min[(nε+1):(nε+nx̂)], Z̃max[(nε+1):(nε+nx̂)]
     foreach(i -> !isinf(x̂0min[i]) && (i_x̂min[i] = false), eachindex(i_x̂min))
     foreach(i -> !isinf(x̂0max[i]) && (i_x̂max[i] = false), eachindex(i_x̂max))
     return i_x̂min, i_x̂max
@@ -824,12 +833,25 @@ function deleteX̂_lincon!(
 )
     nx̃ = nε + nx̂
     nX̂ = length(i_X̂min)
-    X̂0min, X̂0max = @views Z̃min[(nx̃+1):(nx̃+nX̂)], @views Z̃max[(nx̃+1):(nx̃+nX̂)]
+    X̂0min, X̂0max = @views Z̃min[(nx̃+1):(nx̃+nX̂)], Z̃max[(nx̃+1):(nx̃+nX̂)]
     foreach(i -> !isinf(X̂0min[i]) && (i_X̂min[i] = false), eachindex(i_X̂min))
     foreach(i -> !isinf(X̂0max[i]) && (i_X̂max[i] = false), eachindex(i_X̂max))
     return i_X̂min, i_X̂max
 end
 deleteX̂_lincon!(i_X̂min, i_X̂max, ::SimModel, ::SingleShooting, _, _, _, _) = i_X̂min, i_X̂max
+
+"Unset `i_Âmin` and `i_Âmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
+function deleteÂ_lincon!(
+    i_Âmin, i_Âmax, ::SimModel, ::CollocationMethod, Z̃min, Z̃max, nε, nX̂e
+)
+    nε_nX̂e = nε + nX̂e
+    nÂe = length(i_Âmin)
+    Âmin, Âmax = @views Z̃min[(nε_nX̂e+1):(nε_nX̂e+nÂe)], Z̃max[(nε_nX̂e+1):(nε_nX̂e+nÂe)]
+    foreach(i -> !isinf(Âmin[i]) && (i_Âmin[i] = false), eachindex(i_Âmin))
+    foreach(i -> !isinf(Âmax[i]) && (i_Âmax[i] = false), eachindex(i_Âmax))
+    return i_Âmin, i_Âmax
+end
+deleteÂ_lincon!(i_Âmin, i_Âmax, ::SimModel, ::TranscriptionMethod, _, _, _, _) = i_Âmin, i_Âmax
     
 "Unset `i_Ŵmin` and `i_Ŵmax` elements if finite box constraints in `Z̃min` and `Z̃max`."
 function deleteŴ_lincon!(i_Ŵmin, i_Ŵmax, ::SimModel, ::TranscriptionMethod, Z̃min, Z̃max)

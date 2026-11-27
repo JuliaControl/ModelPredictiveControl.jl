@@ -1106,8 +1106,9 @@ function setmodel_estimator!(
     # --- box constraints ---
     Z̃min, Z̃max = init_boxconstraint_mhe(
         model, transcription, He, nx̂, nŵ, nε,
-        con.x̂0min,  con.x̂0max,  con.X̂0min,  con.X̂0max,  con.Ŵmin,   con.Ŵmax, 
-        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, con.A_Ŵmin, con.A_Ŵmax 
+        con.x̂0min, con.x̂0max, con.X̂0min, con.X̂0max, con.Âmin, con.Âmax, con.Ŵmin, con.Ŵmax, 
+        con.A_x̂min, con.A_x̂max, con.C_x̂min, con.C_x̂max, 
+        con.A_Âmin, con.A_Âmax, con.A_Ŵmin, con.A_Ŵmax 
     )
     con.Z̃min .= Z̃min
     con.Z̃max .= Z̃max

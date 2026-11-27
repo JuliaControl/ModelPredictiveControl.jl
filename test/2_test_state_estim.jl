@@ -936,7 +936,7 @@ end
 end
 
 @testitem "MHE construction (LinModel)" setup=[SetupMPCtests] begin
-    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra
+    using .SetupMPCtests, ControlSystemsBase, LinearAlgebra, SparseArrays
     import FiniteDiff
     linmodel = LinModel(sys,Ts,i_d=[3])
 
@@ -1028,11 +1028,12 @@ end
     He, i_ym, nint_u, nint_ym = 1, 1:2, 0, 0
     P̂_0 = fill(0.5, 4, 4)
     P̂_0[diagind(P̂_0)] .= 1.0
-    Q̂, R̂ = 0.5*P̂_0, [0.1 0.01; 0.01 0.1]
+    Q̂ = 0.5*P̂_0
+    R̂ = sparse([0.25 0; 0 0.25]) # to improve coverage of `inv!` 
     mhe17 = MovingHorizonEstimator(linmodel, He, i_ym, nint_u, nint_ym, P̂_0, Q̂, R̂)
     @test mhe17.cov.invP̄    ≈ inv(P̂_0)
     @test mhe17.cov.invQ̂_He ≈ inv(Q̂)
-    @test mhe17.cov.invR̂_He ≈ inv(R̂)
+    @test mhe17.cov.invR̂_He ≈ inv(Matrix(R̂))
     
     @test_throws ArgumentError MovingHorizonEstimator(linmodel)
     @test_throws ArgumentError MovingHorizonEstimator(linmodel, He=0)
